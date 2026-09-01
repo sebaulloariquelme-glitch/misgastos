@@ -18,6 +18,8 @@
     --text: #1a1a1a;
     --text2: #666;
     --text3: #999;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
     --red: #dc2626;
     --red-bg: #fee2e2;
     --accent: #2563eb;
@@ -34,6 +36,8 @@
       --text: #f0f0ed;
       --text2: #999;
       --text3: #555;
+      --green: #4ade80;
+      --green-bg: #14532d44;
       --red: #f87171;
       --red-bg: #7f1d1d44;
       --accent: #60a5fa;
@@ -148,7 +152,39 @@
     border: 1px solid var(--border);
   }
   .saldo-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
-  .saldo-amount { font-size: 32px; font-weight: 600; letter-spacing: -1px; color: var(--red); }
+  .saldo-amount { font-size: 32px; font-weight: 600; letter-spacing: -1px; }
+  .saldo-amount.negativo { color: var(--red); }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 0.75rem;
+  }
+  .metric {
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .metric-value { font-size: 15px; font-weight: 600; }
+  .metric-value.green { color: var(--green); }
+  .metric-value.red   { color: var(--red); }
+
+  .tipo-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tipo-btn {
+    flex: 1; padding: 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    font-size: 14px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+  }
+  .tipo-btn.active-ingreso { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+  .tipo-btn.active-egreso  { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
 
   .section {
     background: var(--surface);
@@ -217,11 +253,15 @@
     border-bottom: 1px solid var(--border);
   }
   .movimiento:last-child { border-bottom: none; }
-  .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--red); }
+  .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .mov-dot.ingreso { background: var(--green); }
+  .mov-dot.egreso  { background: var(--red); }
   .mov-info { flex: 1; min-width: 0; }
   .mov-desc  { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mov-fecha { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; color: var(--red); }
+  .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
+  .mov-amount.ingreso { color: var(--green); }
+  .mov-amount.egreso  { color: var(--red); }
   .mov-del {
     background: none; border: none; color: var(--text3);
     font-size: 16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
@@ -284,34 +324,49 @@
   </div>
 
   <div class="saldo-card">
-    <div class="saldo-label">gastado este mes</div>
+    <div class="saldo-label">neto del mes</div>
     <div class="saldo-amount" id="total-mes">$0</div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">ingresos</div>
+      <div class="metric-value green" id="lbl-ingresos">$0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">egresos</div>
+      <div class="metric-value red" id="lbl-egresos">$0</div>
+    </div>
   </div>
 
   <!-- Solo visible en mes actual -->
   <div id="bloque-formulario">
     <div class="section">
-      <div class="section-header">Nuevo gasto</div>
+      <div class="section-header">Nuevo movimiento</div>
       <div class="section-body">
+        <div class="tipo-toggle">
+          <button class="tipo-btn" id="btn-ingreso" onclick="setTipo('ingreso')">+ Ingreso</button>
+          <button class="tipo-btn active-egreso" id="btn-egreso" onclick="setTipo('egreso')">− Egreso</button>
+        </div>
         <input type="text" id="input-desc" placeholder="Descripción" />
         <div class="row">
           <input type="number" id="input-monto" placeholder="Monto" min="0" />
         </div>
         <p class="error-msg" id="error">Completa todos los campos.</p>
-        <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar gasto</button>
+        <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar</button>
       </div>
     </div>
   </div>
 
   <div class="readonly-notice" id="readonly-notice" style="display:none;">
-    Vista de solo lectura — los gastos no se pueden editar en meses pasados.
+    Vista de solo lectura — los movimientos no se pueden editar en meses pasados.
   </div>
 
   <div class="loading" id="loading">Conectando con Google Sheets...</div>
 
   <div class="section" id="seccion-lista" style="display:none;">
     <div class="lista-header">
-      <span class="lista-title" id="lista-titulo">Gastos</span>
+      <span class="lista-title" id="lista-titulo">Movimientos</span>
     </div>
     <div id="lista"></div>
     <div class="actions" id="acciones-lista">
@@ -319,7 +374,7 @@
     </div>
   </div>
 
-  <p class="empty" id="vacio" style="display:none;">Sin gastos este mes.</p>
+  <p class="empty" id="vacio" style="display:none;">Sin movimientos este mes.</p>
 
 </div>
 
@@ -331,6 +386,7 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 let allData    = [];
+let tipo       = 'egreso';
 let mesOffset  = 0; // 0 = mes actual, -1 = mes anterior, etc.
 
 const ahora = new Date();
@@ -365,13 +421,22 @@ function setSync(state) {
   el.className = 'sync-indicator ' + map[state][1];
 }
 
-function calcGastosMes(mesKey) {
-  let total = 0;
+function setTipo(t) {
+  tipo = t;
+  document.getElementById('btn-ingreso').className = 'tipo-btn' + (t==='ingreso'?' active-ingreso':'');
+  document.getElementById('btn-egreso').className  = 'tipo-btn' + (t==='egreso' ?' active-egreso':'');
+}
+
+function calcMovimientosMes(mesKey) {
+  let ingresos = 0, egresos = 0;
   for (const row of allData) {
     if (row[0] === 'INICIAL') continue;
-    if (String(row[4]).startsWith(mesKey)) total += parseFloat(row[3]) || 0;
+    if (String(row[4]).startsWith(mesKey)) {
+      if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
+      else egresos += parseFloat(row[3]) || 0;
+    }
   }
-  return total;
+  return { ingresos, egresos, neto: egresos - ingresos };
 }
 
 function getSueldo() {
@@ -393,20 +458,23 @@ function getPeriodoPago() {
   return { inicio, fin, inicioStr: toDateStr(inicio), finStr: toDateStr(fin) };
 }
 
-function calcGastosPeriodo(inicioStr, finStr) {
-  let total = 0;
+function calcNetoPeriodo(inicioStr, finStr) {
+  let ingresos = 0, egresos = 0;
   for (const row of allData) {
     if (row[0] === 'INICIAL') continue;
     const f = String(row[4]);
-    if (f >= inicioStr && f <= finStr) total += parseFloat(row[3]) || 0;
+    if (f >= inicioStr && f <= finStr) {
+      if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
+      else egresos += parseFloat(row[3]) || 0;
+    }
   }
-  return total;
+  return egresos - ingresos;
 }
 
 function actualizarDisponible() {
   const sueldo = getSueldo();
   const { fin, inicioStr, finStr } = getPeriodoPago();
-  const gastado   = calcGastosPeriodo(inicioStr, finStr);
+  const gastado   = calcNetoPeriodo(inicioStr, finStr);
   const restante  = sueldo - gastado;
 
   const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
@@ -491,9 +559,13 @@ function actualizarUI() {
   document.getElementById('readonly-notice').style.display   = esHoy ? 'none' : 'block';
   document.getElementById('acciones-lista').style.display    = esHoy ? 'flex' : 'none';
 
-  // Total gastado del mes que se está viendo
-  const total = calcGastosMes(mes.key);
-  document.getElementById('total-mes').textContent = fmt(total);
+  // Ingresos, egresos y neto del mes que se está viendo
+  const { ingresos, egresos, neto } = calcMovimientosMes(mes.key);
+  const totalEl = document.getElementById('total-mes');
+  totalEl.textContent = fmt(neto);
+  totalEl.className   = 'saldo-amount' + (neto > 0 ? ' negativo' : '');
+  document.getElementById('lbl-ingresos').textContent = fmt(ingresos);
+  document.getElementById('lbl-egresos').textContent  = fmt(egresos);
 
   // Monto disponible por día (siempre referido a hoy, independiente del mes que se navega)
   actualizarDisponible();
@@ -506,7 +578,7 @@ function actualizarUI() {
   const vacio   = document.getElementById('vacio');
   const seccion = document.getElementById('seccion-lista');
 
-  document.getElementById('lista-titulo').textContent = `Gastos — ${movs.length}`;
+  document.getElementById('lista-titulo').textContent = `Movimientos — ${movs.length}`;
 
   if (movs.length === 0) {
     lista.innerHTML = '';
@@ -517,12 +589,12 @@ function actualizarUI() {
     seccion.style.display = 'block';
     lista.innerHTML = movs.map(m => `
       <div class="movimiento">
-        <div class="mov-dot"></div>
+        <div class="mov-dot ${m[1]}"></div>
         <div class="mov-info">
           <div class="mov-desc">${m[2]}</div>
-          <div class="mov-fecha">${fmtFecha(String(m[4]))}</div>
+          <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${m[1]}</div>
         </div>
-        <div class="mov-amount">−${fmt(parseFloat(m[3]))}</div>
+        <div class="mov-amount ${m[1]}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
         ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
       </div>
     `).join('');
@@ -544,9 +616,9 @@ async function agregar() {
   document.getElementById('input-monto').value = '';
 
   const fecha = toDateStr(new Date());
-  await post({ action: 'add', id: Date.now(), tipo: 'egreso', desc, monto, fecha });
+  await post({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
 
-  btn.disabled = false; btn.textContent = 'Agregar gasto';
+  btn.disabled = false; btn.textContent = 'Agregar';
 }
 
 async function eliminar(id) {
@@ -554,10 +626,11 @@ async function eliminar(id) {
 }
 
 async function limpiar() {
-  if (!confirm('¿Borrar todos los gastos de este mes?')) return;
+  if (!confirm('¿Borrar todos los movimientos de este mes?')) return;
   await post({ action: 'clear', mes: getMesActual().key });
 }
 
+setTipo('egreso');
 cargar();
 setInterval(cargar, 30000);
 
