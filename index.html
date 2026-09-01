@@ -18,8 +18,6 @@
     --text: #1a1a1a;
     --text2: #666;
     --text3: #999;
-    --green: #16a34a;
-    --green-bg: #dcfce7;
     --red: #dc2626;
     --red-bg: #fee2e2;
     --accent: #2563eb;
@@ -36,8 +34,6 @@
       --text: #f0f0ed;
       --text2: #999;
       --text3: #555;
-      --green: #4ade80;
-      --green-bg: #14532d44;
       --red: #f87171;
       --red-bg: #7f1d1d44;
       --accent: #60a5fa;
@@ -75,8 +71,15 @@
     white-space: nowrap;
   }
   .sync-indicator.syncing { color: var(--accent); border-color: var(--accent); }
-  .sync-indicator.ok      { color: var(--green);  border-color: var(--green); }
+  .sync-indicator.ok      { color: #16a34a;  border-color: #16a34a; }
   .sync-indicator.error   { color: var(--red);    border-color: var(--red); }
+
+  .bienvenida {
+    text-align: center;
+    padding: 1.5rem 1rem 0.25rem;
+  }
+  .bienvenida h2 { font-size: 22px; font-weight: 700; }
+  .bienvenida p { font-size: 13px; color: var(--text2); margin-top: 4px; text-transform: capitalize; }
 
   /* Navegador de mes */
   .mes-nav {
@@ -86,6 +89,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.625rem 1.25rem;
+    margin-top: 1rem;
   }
   .mes-nav button {
     background: none;
@@ -111,6 +115,30 @@
 
   .main { padding: 1rem 1rem 0; max-width: 480px; margin: 0 auto; }
 
+  .disponible-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--accent);
+  }
+  .disponible-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .disponible-amount { font-size: 34px; font-weight: 700; letter-spacing: -1px; color: var(--accent); }
+  .disponible-amount.negativo { color: var(--red); }
+  .disponible-sub { font-size: 12px; color: var(--text3); margin-top: 8px; }
+  .disponible-edit-link {
+    font-size: 12px; color: var(--accent); background: none; border: none;
+    cursor: pointer; margin-top: 10px; font-family: inherit; text-decoration: underline;
+  }
+
+  .sueldo-form { display: none; gap: 8px; margin-top: 10px; }
+  .sueldo-form.visible { display: flex; }
+  .sueldo-form input { flex: 1; }
+  .sueldo-form button {
+    width: auto; margin-top: 0; padding: 9px 14px; white-space: nowrap;
+  }
+
   .saldo-card {
     background: var(--surface);
     border-radius: var(--radius);
@@ -120,51 +148,7 @@
     border: 1px solid var(--border);
   }
   .saldo-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
-  .saldo-amount { font-size: 38px; font-weight: 600; letter-spacing: -1px; }
-  .saldo-amount.negativo { color: var(--red); }
-
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 1rem;
-  }
-  .metric {
-    background: var(--surface);
-    border-radius: var(--radius-sm);
-    padding: 0.75rem 0.5rem;
-    text-align: center;
-    border: 1px solid var(--border);
-  }
-  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
-  .metric-value { font-size: 14px; font-weight: 600; }
-  .metric-value.green { color: var(--green); }
-  .metric-value.red   { color: var(--red); }
-
-  /* Banner saldo anterior */
-  .banner-anterior {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.75rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-  }
-  .banner-anterior span { color: var(--text2); }
-  .banner-anterior strong { color: var(--text); }
-  .banner-anterior button {
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    border: 1px solid var(--accent);
-    background: none;
-    color: var(--accent);
-    cursor: pointer;
-    font-family: inherit;
-  }
+  .saldo-amount { font-size: 32px; font-weight: 600; letter-spacing: -1px; color: var(--red); }
 
   .section {
     background: var(--surface);
@@ -183,8 +167,7 @@
   .section-body { padding: 1rem; }
 
   input[type="text"],
-  input[type="number"],
-  input[type="date"] {
+  input[type="number"] {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border);
@@ -197,23 +180,9 @@
     -webkit-appearance: none;
   }
   input:focus { border-color: var(--accent); }
-  input[type="date"] { color-scheme: light dark; }
 
   .row { display: flex; gap: 8px; margin-top: 8px; }
   .row input { flex: 1; }
-
-  .tipo-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
-  .tipo-btn {
-    flex: 1; padding: 9px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text2);
-    font-size: 14px; font-weight: 500;
-    cursor: pointer; font-family: inherit;
-  }
-  .tipo-btn.active-ingreso { background: var(--green-bg); color: var(--green); border-color: var(--green); }
-  .tipo-btn.active-egreso  { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
 
   .btn-primary {
     width: 100%; margin-top: 10px; padding: 11px;
@@ -248,15 +217,11 @@
     border-bottom: 1px solid var(--border);
   }
   .movimiento:last-child { border-bottom: none; }
-  .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .mov-dot.ingreso { background: var(--green); }
-  .mov-dot.egreso  { background: var(--red); }
+  .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--red); }
   .mov-info { flex: 1; min-width: 0; }
   .mov-desc  { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mov-fecha { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
-  .mov-amount.ingreso { color: var(--green); }
-  .mov-amount.egreso  { color: var(--red); }
+  .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; color: var(--red); }
   .mov-del {
     background: none; border: none; color: var(--text3);
     font-size: 16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
@@ -271,7 +236,7 @@
     border-top: 1px solid var(--border);
   }
 
-  /* Ocultar formulario en meses pasados/futuros */
+  /* Ocultar formulario en meses pasados */
   .readonly-notice {
     background: var(--surface2);
     border-radius: var(--radius-sm);
@@ -291,6 +256,11 @@
   <div class="sync-indicator" id="sync-indicator">Cargando...</div>
 </header>
 
+<div class="bienvenida">
+  <h2>¡Bienvenido Seba!</h2>
+  <p id="fecha-hoy"></p>
+</div>
+
 <div class="mes-nav">
   <button id="btn-prev" onclick="cambiarMes(-1)">‹</button>
   <div style="text-align:center;">
@@ -302,69 +272,46 @@
 
 <div class="main">
 
+  <div class="disponible-card">
+    <div class="disponible-label">Monto disponible por día</div>
+    <div class="disponible-amount" id="disponible-amount">$0</div>
+    <div class="disponible-sub" id="disponible-sub"></div>
+    <button class="disponible-edit-link" onclick="toggleSueldoForm()">Editar sueldo mensual</button>
+    <div class="sueldo-form" id="sueldo-form">
+      <input type="number" id="input-sueldo" placeholder="Sueldo mensual" min="0" />
+      <button class="btn-primary" onclick="setSueldo()">Guardar</button>
+    </div>
+  </div>
+
   <div class="saldo-card">
-    <div class="saldo-label">saldo del mes</div>
-    <div class="saldo-amount" id="saldo">$0</div>
-  </div>
-
-  <div class="metrics">
-    <div class="metric">
-      <div class="metric-label">inicial</div>
-      <div class="metric-value" id="lbl-inicial">$0</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">ingresos</div>
-      <div class="metric-value green" id="lbl-ingresos">$0</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">egresos</div>
-      <div class="metric-value red" id="lbl-egresos">$0</div>
-    </div>
-  </div>
-
-  <!-- Banner saldo mes anterior -->
-  <div class="banner-anterior" id="banner-anterior" style="display:none;">
-    <span>Saldo <span id="banner-mes-ant"></span>: <strong id="banner-saldo-ant"></strong></span>
-    <button onclick="usarSaldoAnterior()">Usar como inicial</button>
+    <div class="saldo-label">gastado este mes</div>
+    <div class="saldo-amount" id="total-mes">$0</div>
   </div>
 
   <!-- Solo visible en mes actual -->
   <div id="bloque-formulario">
     <div class="section">
-      <div class="section-header">Monto inicial</div>
+      <div class="section-header">Nuevo gasto</div>
       <div class="section-body">
-        <input type="number" id="input-inicial" placeholder="$0" min="0" />
-        <button class="btn-primary" onclick="setInicial()">Fijar monto inicial</button>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-header">Nuevo movimiento</div>
-      <div class="section-body">
-        <div class="tipo-toggle">
-          <button class="tipo-btn active-ingreso" id="btn-ingreso" onclick="setTipo('ingreso')">+ Ingreso</button>
-          <button class="tipo-btn" id="btn-egreso" onclick="setTipo('egreso')">− Egreso</button>
-        </div>
         <input type="text" id="input-desc" placeholder="Descripción" />
         <div class="row">
           <input type="number" id="input-monto" placeholder="Monto" min="0" />
-          <input type="date" id="input-fecha" />
         </div>
         <p class="error-msg" id="error">Completa todos los campos.</p>
-        <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar</button>
+        <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar gasto</button>
       </div>
     </div>
   </div>
 
   <div class="readonly-notice" id="readonly-notice" style="display:none;">
-    Vista de solo lectura — los movimientos no se pueden editar en meses pasados.
+    Vista de solo lectura — los gastos no se pueden editar en meses pasados.
   </div>
 
   <div class="loading" id="loading">Conectando con Google Sheets...</div>
 
   <div class="section" id="seccion-lista" style="display:none;">
     <div class="lista-header">
-      <span class="lista-title" id="lista-titulo">Movimientos</span>
+      <span class="lista-title" id="lista-titulo">Gastos</span>
     </div>
     <div id="lista"></div>
     <div class="actions" id="acciones-lista">
@@ -372,36 +319,37 @@
     </div>
   </div>
 
-  <p class="empty" id="vacio" style="display:none;">Sin movimientos este mes.</p>
+  <p class="empty" id="vacio" style="display:none;">Sin gastos este mes.</p>
 
 </div>
 
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbxzLSTmN53pMhOr56GIzAeJjhxn_U7e8JOjmebUfk7NrtluBg-O2EFRBhVqcD2B-exE/exec';
+const PAYDAY = 28;
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 let allData    = [];
-let tipo       = 'ingreso';
 let mesOffset  = 0; // 0 = mes actual, -1 = mes anterior, etc.
 
-const ahora   = new Date();
-const hoyStr  = ahora.toISOString().split('T')[0];
+const ahora = new Date();
 
-document.getElementById('input-fecha').value = hoyStr;
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+const hoyStr = toDateStr(ahora);
+
+document.getElementById('fecha-hoy').textContent =
+  `${DIAS[ahora.getDay()]} ${ahora.getDate()} de ${MESES[ahora.getMonth()].toLowerCase()}`;
 
 function getMesActual() {
   const d = new Date(ahora.getFullYear(), ahora.getMonth() + mesOffset, 1);
-  return { year: d.getFullYear(), month: d.getMonth(), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` };
-}
-
-function getMesAnterior() {
-  const d = new Date(ahora.getFullYear(), ahora.getMonth() + mesOffset - 1, 1);
-  return { year: d.getFullYear(), month: d.getMonth(), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: MESES[d.getMonth()] };
+  return { year: d.getFullYear(), month: d.getMonth(), key: `${d.getFullYear()}-${pad(d.getMonth()+1)}` };
 }
 
 function fmt(n) {
-  return '$' + Math.abs(n).toLocaleString('es-CL');
+  return '$' + Math.round(Math.abs(n)).toLocaleString('es-CL');
 }
 
 function fmtFecha(str) {
@@ -417,30 +365,89 @@ function setSync(state) {
   el.className = 'sync-indicator ' + map[state][1];
 }
 
-function setTipo(t) {
-  tipo = t;
-  document.getElementById('btn-ingreso').className = 'tipo-btn' + (t==='ingreso'?' active-ingreso':'');
-  document.getElementById('btn-egreso').className  = 'tipo-btn' + (t==='egreso' ?' active-egreso':'');
+function calcGastosMes(mesKey) {
+  let total = 0;
+  for (const row of allData) {
+    if (row[0] === 'INICIAL') continue;
+    if (String(row[4]).startsWith(mesKey)) total += parseFloat(row[3]) || 0;
+  }
+  return total;
 }
 
-function calcSaldoMes(mesKey) {
-  let ini = 0, ingresos = 0, egresos = 0;
-  for (const row of allData) {
-    if (row[0] === 'INICIAL' && row[4] === mesKey) { ini = parseFloat(row[5]) || 0; }
-    else if (row[0] !== 'INICIAL' && String(row[4]).startsWith(mesKey)) {
-      if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
-      else egresos += parseFloat(row[3]) || 0;
-    }
+function getSueldo() {
+  const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
+  return row ? (parseFloat(row[5]) || 0) : 0;
+}
+
+// Periodo de pago: del día 28 de un mes al 27 del mes siguiente.
+function getPeriodoPago() {
+  const dia = ahora.getDate();
+  let inicio, fin;
+  if (dia >= PAYDAY) {
+    inicio = new Date(ahora.getFullYear(), ahora.getMonth(), PAYDAY);
+    fin    = new Date(ahora.getFullYear(), ahora.getMonth() + 1, PAYDAY - 1);
+  } else {
+    inicio = new Date(ahora.getFullYear(), ahora.getMonth() - 1, PAYDAY);
+    fin    = new Date(ahora.getFullYear(), ahora.getMonth(), PAYDAY - 1);
   }
-  return { ini, ingresos, egresos, saldo: ini + ingresos - egresos };
+  return { inicio, fin, inicioStr: toDateStr(inicio), finStr: toDateStr(fin) };
+}
+
+function calcGastosPeriodo(inicioStr, finStr) {
+  let total = 0;
+  for (const row of allData) {
+    if (row[0] === 'INICIAL') continue;
+    const f = String(row[4]);
+    if (f >= inicioStr && f <= finStr) total += parseFloat(row[3]) || 0;
+  }
+  return total;
+}
+
+function actualizarDisponible() {
+  const sueldo = getSueldo();
+  const { fin, inicioStr, finStr } = getPeriodoPago();
+  const gastado   = calcGastosPeriodo(inicioStr, finStr);
+  const restante  = sueldo - gastado;
+
+  const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const finMed = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
+  const diasRestantes = Math.max(1, Math.round((finMed - hoyMed) / 86400000) + 1);
+  const porDia = restante / diasRestantes;
+
+  const el    = document.getElementById('disponible-amount');
+  const subEl = document.getElementById('disponible-sub');
+
+  if (sueldo <= 0) {
+    el.textContent = '—';
+    el.className   = 'disponible-amount';
+    subEl.textContent = 'Configura tu sueldo mensual para calcularlo';
+  } else {
+    el.textContent = fmt(porDia);
+    el.className   = 'disponible-amount' + (porDia < 0 ? ' negativo' : '');
+    subEl.textContent = `${fmt(restante)} disponibles · ${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
+  }
+
+  const inputSueldo = document.getElementById('input-sueldo');
+  if (document.activeElement !== inputSueldo) {
+    inputSueldo.value = sueldo > 0 ? sueldo : '';
+  }
+}
+
+function toggleSueldoForm() {
+  document.getElementById('sueldo-form').classList.toggle('visible');
+}
+
+async function setSueldo() {
+  const v = parseFloat(document.getElementById('input-sueldo').value);
+  if (isNaN(v) || v < 0) return;
+  await post({ action: 'set_inicial', mes: 'SUELDO', value: v });
+  document.getElementById('sueldo-form').classList.remove('visible');
 }
 
 function cambiarMes(dir) {
   mesOffset += dir;
-  // No ir más allá del mes actual
   if (mesOffset > 0) mesOffset = 0;
   actualizarUI();
-  document.getElementById('input-fecha').value = getMesActual().key + '-01';
 }
 
 async function post(payload) {
@@ -471,9 +478,8 @@ async function cargar() {
 }
 
 function actualizarUI() {
-  const mes    = getMesActual();
-  const mesAnt = getMesAnterior();
-  const esHoy  = mesOffset === 0;
+  const mes   = getMesActual();
+  const esHoy = mesOffset === 0;
 
   // Etiqueta mes
   document.getElementById('mes-label').textContent = `${MESES[mes.month]} ${mes.year}`;
@@ -485,34 +491,14 @@ function actualizarUI() {
   document.getElementById('readonly-notice').style.display   = esHoy ? 'none' : 'block';
   document.getElementById('acciones-lista').style.display    = esHoy ? 'flex' : 'none';
 
-  // Calcular cifras del mes
-  const { ini, ingresos, egresos, saldo } = calcSaldoMes(mes.key);
+  // Total gastado del mes que se está viendo
+  const total = calcGastosMes(mes.key);
+  document.getElementById('total-mes').textContent = fmt(total);
 
-  const saldoEl = document.getElementById('saldo');
-  saldoEl.textContent = fmt(saldo);
-  saldoEl.className   = 'saldo-amount' + (saldo < 0 ? ' negativo' : '');
+  // Monto disponible por día (siempre referido a hoy, independiente del mes que se navega)
+  actualizarDisponible();
 
-  document.getElementById('lbl-inicial').textContent  = fmt(ini);
-  document.getElementById('lbl-ingresos').textContent = fmt(ingresos);
-  document.getElementById('lbl-egresos').textContent  = fmt(egresos);
-
-  // Banner saldo mes anterior (solo en mes actual y si el anterior tiene datos)
-  if (esHoy) {
-    const antData = calcSaldoMes(mesAnt.key);
-    const tieneAnterior = antData.ini !== 0 || antData.ingresos !== 0 || antData.egresos !== 0;
-    const banner = document.getElementById('banner-anterior');
-    if (tieneAnterior) {
-      document.getElementById('banner-mes-ant').textContent   = mesAnt.label;
-      document.getElementById('banner-saldo-ant').textContent = fmt(antData.saldo);
-      banner.style.display = 'flex';
-    } else {
-      banner.style.display = 'none';
-    }
-  } else {
-    document.getElementById('banner-anterior').style.display = 'none';
-  }
-
-  // Lista movimientos del mes
+  // Lista de gastos del mes
   const movs = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key))
     .sort((a,b) => String(b[4]).localeCompare(String(a[4])));
 
@@ -520,7 +506,7 @@ function actualizarUI() {
   const vacio   = document.getElementById('vacio');
   const seccion = document.getElementById('seccion-lista');
 
-  document.getElementById('lista-titulo').textContent = `Movimientos — ${movs.length}`;
+  document.getElementById('lista-titulo').textContent = `Gastos — ${movs.length}`;
 
   if (movs.length === 0) {
     lista.innerHTML = '';
@@ -531,40 +517,24 @@ function actualizarUI() {
     seccion.style.display = 'block';
     lista.innerHTML = movs.map(m => `
       <div class="movimiento">
-        <div class="mov-dot ${m[1]}"></div>
+        <div class="mov-dot"></div>
         <div class="mov-info">
           <div class="mov-desc">${m[2]}</div>
-          <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${m[1]}</div>
+          <div class="mov-fecha">${fmtFecha(String(m[4]))}</div>
         </div>
-        <div class="mov-amount ${m[1]}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
+        <div class="mov-amount">−${fmt(parseFloat(m[3]))}</div>
         ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
       </div>
     `).join('');
   }
 }
 
-async function setInicial() {
-  const v = parseFloat(document.getElementById('input-inicial').value);
-  if (isNaN(v) || v < 0) return;
-  document.getElementById('input-inicial').value = '';
-  await post({ action: 'set_inicial', mes: getMesActual().key, value: v });
-}
-
-async function usarSaldoAnterior() {
-  const ant = calcSaldoMes(getMesAnterior().key);
-  document.getElementById('input-inicial').value = ant.saldo;
-  document.getElementById('banner-anterior').style.display = 'none';
-  // Scroll al input
-  document.getElementById('input-inicial').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 async function agregar() {
   const desc  = document.getElementById('input-desc').value.trim();
   const monto = parseFloat(document.getElementById('input-monto').value);
-  const fecha = document.getElementById('input-fecha').value;
   const err   = document.getElementById('error');
 
-  if (!desc || isNaN(monto) || monto <= 0 || !fecha) { err.style.display = 'block'; return; }
+  if (!desc || isNaN(monto) || monto <= 0) { err.style.display = 'block'; return; }
   err.style.display = 'none';
 
   const btn = document.getElementById('btn-agregar');
@@ -572,11 +542,11 @@ async function agregar() {
 
   document.getElementById('input-desc').value  = '';
   document.getElementById('input-monto').value = '';
-  document.getElementById('input-fecha').value = hoyStr;
 
-  await post({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
+  const fecha = toDateStr(new Date());
+  await post({ action: 'add', id: Date.now(), tipo: 'egreso', desc, monto, fecha });
 
-  btn.disabled = false; btn.textContent = 'Agregar';
+  btn.disabled = false; btn.textContent = 'Agregar gasto';
 }
 
 async function eliminar(id) {
@@ -584,17 +554,16 @@ async function eliminar(id) {
 }
 
 async function limpiar() {
-  if (!confirm('¿Borrar todos los movimientos de este mes?')) return;
+  if (!confirm('¿Borrar todos los gastos de este mes?')) return;
   await post({ action: 'clear', mes: getMesActual().key });
 }
 
-setTipo('ingreso');
 cargar();
 setInterval(cargar, 30000);
 
 document.getElementById('input-desc').addEventListener('keydown',  e => { if (e.key==='Enter') document.getElementById('input-monto').focus(); });
 document.getElementById('input-monto').addEventListener('keydown', e => { if (e.key==='Enter') agregar(); });
-document.getElementById('input-inicial').addEventListener('keydown', e => { if (e.key==='Enter') setInicial(); });
+document.getElementById('input-sueldo').addEventListener('keydown', e => { if (e.key==='Enter') setSueldo(); });
 </script>
 </body>
 </html>
