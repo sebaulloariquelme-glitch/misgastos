@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Mi Caja" />
+<title>Mi Caja</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f5f0;
+    --surface: #ffffff;
+    --surface2: #f9f9f7;
+    --border: rgba(0,0,0,0.1);
+    --text: #1a1a1a;
+    --text2: #666;
+    --text3: #999;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --accent: #2563eb;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111110;
+      --surface: #1c1c1a;
+      --surface2: #242422;
+      --border: rgba(255,255,255,0.1);
+      --text: #f0f0ed;
+      --text2: #999;
+      --text3: #555;
+      --green: #4ade80;
+      --green-bg: #14532d44;
+      --red: #f87171;
+      --red-bg: #7f1d1d44;
+      --accent: #60a5fa;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    padding-bottom: 3rem;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.875rem 1.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header h1 { font-size: 17px; font-weight: 600; }
+
+  .sync-indicator {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--text3);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .sync-indicator.syncing { color: var(--accent); border-color: var(--accent); }
+  .sync-indicator.ok      { color: var(--green);  border-color: var(--green); }
+  .sync-indicator.error   { color: var(--red);    border-color: var(--red); }
+
+  /* Navegador de mes */
+  .mes-nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 1.25rem;
+  }
+  .mes-nav button {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+  }
+  .mes-nav button:active { background: var(--surface2); }
+  .mes-nav button:disabled { opacity: 0.25; cursor: default; }
+  .mes-label { font-size: 15px; font-weight: 600; text-transform: capitalize; }
+  .mes-actual-tag {
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    padding: 1px 7px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .main { padding: 1rem 1rem 0; max-width: 480px; margin: 0 auto; }
+
+  .saldo-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+  }
+  .saldo-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .saldo-amount { font-size: 38px; font-weight: 600; letter-spacing: -1px; }
+  .saldo-amount.negativo { color: var(--red); }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .metric {
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .metric-value { font-size: 14px; font-weight: 600; }
+  .metric-value.green { color: var(--green); }
+  .metric-value.red   { color: var(--red); }
+
+  /* Banner saldo anterior */
+  .banner-anterior {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+  .banner-anterior span { color: var(--text2); }
+  .banner-anterior strong { color: var(--text); }
+  .banner-anterior button {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--accent);
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 0.875rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+  }
+  .section-body { padding: 1rem; }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="date"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  input:focus { border-color: var(--accent); }
+  input[type="date"] { color-scheme: light dark; }
+
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  .row input { flex: 1; }
+
+  .tipo-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tipo-btn {
+    flex: 1; padding: 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    font-size: 14px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+  }
+  .tipo-btn.active-ingreso { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+  .tipo-btn.active-egreso  { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
+
+  .btn-primary {
+    width: 100%; margin-top: 10px; padding: 11px;
+    border-radius: var(--radius-sm); border: none;
+    background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary:active:not(:disabled) { opacity: 0.85; }
+
+  .btn-ghost {
+    background: none; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 14px;
+    color: var(--text2); font-size: 13px;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn-danger { color: var(--red); border-color: var(--red-bg); }
+
+  .error-msg { font-size: 12px; color: var(--red); margin-top: 6px; display: none; }
+
+  .lista-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.875rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .lista-title { font-size: 13px; font-weight: 500; color: var(--text2); }
+
+  .movimiento {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .movimiento:last-child { border-bottom: none; }
+  .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .mov-dot.ingreso { background: var(--green); }
+  .mov-dot.egreso  { background: var(--red); }
+  .mov-info { flex: 1; min-width: 0; }
+  .mov-desc  { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mov-fecha { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
+  .mov-amount.ingreso { color: var(--green); }
+  .mov-amount.egreso  { color: var(--red); }
+  .mov-del {
+    background: none; border: none; color: var(--text3);
+    font-size: 16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
+  }
+
+  .empty   { text-align: center; padding: 2rem 1rem; color: var(--text3); font-size: 14px; }
+  .loading { text-align: center; padding: 2rem 1rem; color: var(--text3); font-size: 14px; }
+
+  .actions {
+    display: flex; gap: 8px;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Ocultar formulario en meses pasados/futuros */
+  .readonly-notice {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    color: var(--text2);
+    text-align: center;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mi Caja</h1>
+  <div class="sync-indicator" id="sync-indicator">Cargando...</div>
+</header>
+
+<div class="mes-nav">
+  <button id="btn-prev" onclick="cambiarMes(-1)">‹</button>
+  <div style="text-align:center;">
+    <span class="mes-label" id="mes-label"></span>
+    <span class="mes-actual-tag" id="mes-tag" style="display:none;">hoy</span>
+  </div>
+  <button id="btn-next" onclick="cambiarMes(1)">›</button>
+</div>
+
+<div class="main">
+
+  <div class="saldo-card">
+    <div class="saldo-label">saldo del mes</div>
+    <div class="saldo-amount" id="saldo">$0</div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">inicial</div>
+      <div class="metric-value" id="lbl-inicial">$0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">ingresos</div>
+      <div class="metric-value green" id="lbl-ingresos">$0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">egresos</div>
+      <div class="metric-value red" id="lbl-egresos">$0</div>
+    </div>
+  </div>
+
+  <!-- Banner saldo mes anterior -->
+  <div class="banner-anterior" id="banner-anterior" style="display:none;">
+    <span>Saldo <span id="banner-mes-ant"></span>: <strong id="banner-saldo-ant"></strong></span>
+    <button onclick="usarSaldoAnterior()">Usar como inicial</button>
+  </div>
+
+  <!-- Solo visible en mes actual -->
+  <div id="bloque-formulario">
+    <div class="section">
+      <div class="section-header">Monto inicial</div>
+      <div class="section-body">
+        <input type="number" id="input-inicial" placeholder="$0" min="0" />
+        <button class="btn-primary" onclick="setInicial()">Fijar monto inicial</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">Nuevo movimiento</div>
+      <div class="section-body">
+        <div class="tipo-toggle">
+          <button class="tipo-btn active-ingreso" id="btn-ingreso" onclick="setTipo('ingreso')">+ Ingreso</button>
+          <button class="tipo-btn" id="btn-egreso" onclick="setTipo('egreso')">− Egreso</button>
+        </div>
+        <input type="text" id="input-desc" placeholder="Descripción" />
+        <div class="row">
+          <input type="number" id="input-monto" placeholder="Monto" min="0" />
+          <input type="date" id="input-fecha" />
+        </div>
+        <p class="error-msg" id="error">Completa todos los campos.</p>
+        <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="readonly-notice" id="readonly-notice" style="display:none;">
+    Vista de solo lectura — los movimientos no se pueden editar en meses pasados.
+  </div>
+
+  <div class="loading" id="loading">Conectando con Google Sheets...</div>
+
+  <div class="section" id="seccion-lista" style="display:none;">
+    <div class="lista-header">
+      <span class="lista-title" id="lista-titulo">Movimientos</span>
+    </div>
+    <div id="lista"></div>
+    <div class="actions" id="acciones-lista">
+      <button class="btn-ghost btn-danger" onclick="limpiar()">Borrar mes</button>
+    </div>
+  </div>
+
+  <p class="empty" id="vacio" style="display:none;">Sin movimientos este mes.</p>
+
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbwo6Zp05IwZBxffl1YK1q_zP4VdBv_KwcKNnkbB50OInoTmH19tP9xF9pl7k9rL0nEs/exec';
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+let allData    = [];
+let tipo       = 'ingreso';
+let mesOffset  = 0; // 0 = mes actual, -1 = mes anterior, etc.
+
+const ahora   = new Date();
+const hoyStr  = ahora.toISOString().split('T')[0];
+
+document.getElementById('input-fecha').value = hoyStr;
+
+function getMesActual() {
+  const d = new Date(ahora.getFullYear(), ahora.getMonth() + mesOffset, 1);
+  return { year: d.getFullYear(), month: d.getMonth(), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` };
+}
+
+function getMesAnterior() {
+  const d = new Date(ahora.getFullYear(), ahora.getMonth() + mesOffset - 1, 1);
+  return { year: d.getFullYear(), month: d.getMonth(), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: MESES[d.getMonth()] };
+}
+
+function fmt(n) {
+  return '$' + Math.abs(n).toLocaleString('es-CL');
+}
+
+function fmtFecha(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  return `${parseInt(d)} ${MESES[parseInt(m)-1].toLowerCase().slice(0,3)} ${y}`;
+}
+
+function setSync(state) {
+  const el = document.getElementById('sync-indicator');
+  const map = { syncing:['Sincronizando…','syncing'], ok:['Sincronizado ✓','ok'], error:['Sin conexión','error'] };
+  el.textContent = map[state][0];
+  el.className = 'sync-indicator ' + map[state][1];
+}
+
+function setTipo(t) {
+  tipo = t;
+  document.getElementById('btn-ingreso').className = 'tipo-btn' + (t==='ingreso'?' active-ingreso':'');
+  document.getElementById('btn-egreso').className  = 'tipo-btn' + (t==='egreso' ?' active-egreso':'');
+}
+
+function calcSaldoMes(mesKey) {
+  let ini = 0, ingresos = 0, egresos = 0;
+  for (const row of allData) {
+    if (row[0] === 'INICIAL' && row[4] === mesKey) { ini = parseFloat(row[5]) || 0; }
+    else if (row[0] !== 'INICIAL' && String(row[4]).startsWith(mesKey)) {
+      if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
+      else egresos += parseFloat(row[3]) || 0;
+    }
+  }
+  return { ini, ingresos, egresos, saldo: ini + ingresos - egresos };
+}
+
+function cambiarMes(dir) {
+  mesOffset += dir;
+  // No ir más allá del mes actual
+  if (mesOffset > 0) mesOffset = 0;
+  actualizarUI();
+  document.getElementById('input-fecha').value = getMesActual().key + '-01';
+}
+
+async function post(payload) {
+  setSync('syncing');
+  try {
+    await fetch(API, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    await cargar();
+    setSync('ok');
+  } catch(e) { setSync('error'); }
+}
+
+async function cargar() {
+  try {
+    const res  = await fetch(API + '?t=' + Date.now());
+    const rows = await res.json();
+    allData = rows.slice(1); // quitar encabezados
+    actualizarUI();
+    setSync('ok');
+    document.getElementById('loading').style.display = 'none';
+  } catch(e) {
+    setSync('error');
+    document.getElementById('loading').textContent = 'Error al conectar. Revisa tu conexión.';
+  }
+}
+
+function actualizarUI() {
+  const mes    = getMesActual();
+  const mesAnt = getMesAnterior();
+  const esHoy  = mesOffset === 0;
+
+  // Etiqueta mes
+  document.getElementById('mes-label').textContent = `${MESES[mes.month]} ${mes.year}`;
+  document.getElementById('mes-tag').style.display = esHoy ? 'inline' : 'none';
+  document.getElementById('btn-next').disabled = esHoy;
+
+  // Formulario solo en mes actual
+  document.getElementById('bloque-formulario').style.display = esHoy ? 'block' : 'none';
+  document.getElementById('readonly-notice').style.display   = esHoy ? 'none' : 'block';
+  document.getElementById('acciones-lista').style.display    = esHoy ? 'flex' : 'none';
+
+  // Calcular cifras del mes
+  const { ini, ingresos, egresos, saldo } = calcSaldoMes(mes.key);
+
+  const saldoEl = document.getElementById('saldo');
+  saldoEl.textContent = fmt(saldo);
+  saldoEl.className   = 'saldo-amount' + (saldo < 0 ? ' negativo' : '');
+
+  document.getElementById('lbl-inicial').textContent  = fmt(ini);
+  document.getElementById('lbl-ingresos').textContent = fmt(ingresos);
+  document.getElementById('lbl-egresos').textContent  = fmt(egresos);
+
+  // Banner saldo mes anterior (solo en mes actual y si el anterior tiene datos)
+  if (esHoy) {
+    const antData = calcSaldoMes(mesAnt.key);
+    const tieneAnterior = antData.ini !== 0 || antData.ingresos !== 0 || antData.egresos !== 0;
+    const banner = document.getElementById('banner-anterior');
+    if (tieneAnterior) {
+      document.getElementById('banner-mes-ant').textContent   = mesAnt.label;
+      document.getElementById('banner-saldo-ant').textContent = fmt(antData.saldo);
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  } else {
+    document.getElementById('banner-anterior').style.display = 'none';
+  }
+
+  // Lista movimientos del mes
+  const movs = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key))
+    .sort((a,b) => String(b[4]).localeCompare(String(a[4])));
+
+  const lista   = document.getElementById('lista');
+  const vacio   = document.getElementById('vacio');
+  const seccion = document.getElementById('seccion-lista');
+
+  document.getElementById('lista-titulo').textContent = `Movimientos — ${movs.length}`;
+
+  if (movs.length === 0) {
+    lista.innerHTML = '';
+    vacio.style.display   = 'block';
+    seccion.style.display = 'none';
+  } else {
+    vacio.style.display   = 'none';
+    seccion.style.display = 'block';
+    lista.innerHTML = movs.map(m => `
+      <div class="movimiento">
+        <div class="mov-dot ${m[1]}"></div>
+        <div class="mov-info">
+          <div class="mov-desc">${m[2]}</div>
+          <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${m[1]}</div>
+        </div>
+        <div class="mov-amount ${m[1]}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
+        ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
+      </div>
+    `).join('');
+  }
+}
+
+async function setInicial() {
+  const v = parseFloat(document.getElementById('input-inicial').value);
+  if (isNaN(v) || v < 0) return;
+  document.getElementById('input-inicial').value = '';
+  await post({ action: 'set_inicial', mes: getMesActual().key, value: v });
+}
+
+async function usarSaldoAnterior() {
+  const ant = calcSaldoMes(getMesAnterior().key);
+  document.getElementById('input-inicial').value = ant.saldo;
+  document.getElementById('banner-anterior').style.display = 'none';
+  // Scroll al input
+  document.getElementById('input-inicial').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function agregar() {
+  const desc  = document.getElementById('input-desc').value.trim();
+  const monto = parseFloat(document.getElementById('input-monto').value);
+  const fecha = document.getElementById('input-fecha').value;
+  const err   = document.getElementById('error');
+
+  if (!desc || isNaN(monto) || monto <= 0 || !fecha) { err.style.display = 'block'; return; }
+  err.style.display = 'none';
+
+  const btn = document.getElementById('btn-agregar');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  document.getElementById('input-desc').value  = '';
+  document.getElementById('input-monto').value = '';
+  document.getElementById('input-fecha').value = hoyStr;
+
+  await post({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
+
+  btn.disabled = false; btn.textContent = 'Agregar';
+}
+
+async function eliminar(id) {
+  await post({ action: 'delete', id });
+}
+
+async function limpiar() {
+  if (!confirm('¿Borrar todos los movimientos de este mes?')) return;
+  await post({ action: 'clear', mes: getMesActual().key });
+}
+
+setTipo('ingreso');
+cargar();
+setInterval(cargar, 30000);
+
+document.getElementById('input-desc').addEventListener('keydown',  e => { if (e.key==='Enter') document.getElementById('input-monto').focus(); });
+document.getElementById('input-monto').addEventListener('keydown', e => { if (e.key==='Enter') agregar(); });
+document.getElementById('input-inicial').addEventListener('keydown', e => { if (e.key==='Enter') setInicial(); });
+</script>
+</body>
+</html>
