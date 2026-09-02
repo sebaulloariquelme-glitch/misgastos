@@ -627,7 +627,7 @@ function trazarRectRedondeado(ctx, x, y, w, h, r) {
 
 function descargarResumenImagen() {
   const mes  = getMesActual();
-  const { ingresos, egresos, neto } = calcMovimientosMes(mes.key);
+  const { ingresos, egresos } = calcMovimientosMes(mes.key);
   const cantidad = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key)).length;
 
   if (cantidad === 0) { alert('No hay movimientos para resumir este mes.'); return; }
@@ -636,7 +636,7 @@ function descargarResumenImagen() {
   const { inicioStr, finStr } = getPeriodoPago();
   const saldoFinal = sueldo - calcNetoPeriodo(inicioStr, finStr);
 
-  const W = 800, H = 610, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
+  const W = 800, H = 572, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -664,17 +664,16 @@ function descargarResumenImagen() {
 
   y += 80;
   ctx.font = '700 48px -apple-system, "Segoe UI", sans-serif';
-  ctx.fillStyle = neto > 0 ? '#dc2626' : '#16a34a';
-  ctx.fillText(fmt(neto), left, y);
+  ctx.fillStyle = sueldo > 0 && saldoFinal < 0 ? '#dc2626' : '#16a34a';
+  ctx.fillText(sueldo > 0 ? fmt(saldoFinal) : '—', left, y);
 
   y += 24;
   ctx.font = '400 13px -apple-system, "Segoe UI", sans-serif';
   ctx.fillStyle = '#999';
-  ctx.fillText(neto > 0 ? 'gastado neto este mes' : 'ahorro neto este mes', left, y);
+  ctx.fillText('saldo final del período de pago', left, y);
 
   const filas = [
     ['Saldo disponible', sueldo > 0 ? fmt(sueldo) : '—', '#2563eb'],
-    ['Saldo final', sueldo > 0 ? fmt(saldoFinal) : '—', saldoFinal < 0 ? '#dc2626' : '#16a34a'],
     ['Ingresos', fmt(ingresos), '#16a34a'],
     ['Egresos', fmt(egresos), '#dc2626'],
     ['Movimientos', String(cantidad), '#1a1a1a'],
