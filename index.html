@@ -135,6 +135,12 @@
   .disponible-label { font-size: 11px; color: rgba(255,255,255,0.75); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
   .disponible-amount { font-size: 34px; font-weight: 700; letter-spacing: -1px; color: #fff; }
   .disponible-sub { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 8px; }
+
+  .disponible-progress-wrap { margin-top: 12px; }
+  .disponible-progress-label { font-size: 11px; color: rgba(255,255,255,0.85); margin-bottom: 6px; }
+  .disponible-progress { background: rgba(255,255,255,0.25); border-radius: 999px; height: 7px; overflow: hidden; }
+  .disponible-progress-bar { height: 100%; background: #fff; border-radius: 999px; transition: width .3s ease; }
+
   .disponible-edit-link {
     font-size: 12px; color: #fff; background: none; border: none;
     cursor: pointer; margin-top: 10px; font-family: inherit; text-decoration: underline;
@@ -262,9 +268,30 @@
     background: none; border: none; color: var(--text3);
     font-size: 16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
   }
+  .mov-info.editable { cursor: pointer; }
+  .mov-info.editable:active { opacity: 0.6; }
 
   .empty   { text-align: center; padding: 2rem 1rem; color: var(--text3); font-size: 14px; }
   .loading { text-align: center; padding: 2rem 1rem; color: var(--text3); font-size: 14px; }
+
+  .toast {
+    position: fixed;
+    left: 50%; bottom: 24px;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 50;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    white-space: nowrap;
+  }
+  .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   .actions {
     display: flex; gap: 8px;
@@ -312,6 +339,10 @@
     <div class="disponible-label">Monto disponible por día</div>
     <div class="disponible-amount" id="disponible-amount">$0</div>
     <div class="disponible-sub" id="disponible-sub"></div>
+    <div class="disponible-progress-wrap" id="disponible-progress-wrap" style="display:none;">
+      <div class="disponible-progress-label" id="disponible-progress-label"></div>
+      <div class="disponible-progress"><div class="disponible-progress-bar" id="disponible-progress-bar"></div></div>
+    </div>
     <button class="disponible-edit-link" onclick="toggleSueldoForm()">Editar sueldo mensual</button>
     <div class="sueldo-form" id="sueldo-form">
       <input type="number" id="input-sueldo" placeholder="Sueldo mensual" min="0" />
@@ -345,6 +376,7 @@
         </div>
         <p class="error-msg" id="error">Completa todos los campos.</p>
         <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar</button>
+        <button class="btn-ghost" id="btn-cancelar-edicion" style="display:none; width:100%; margin-top:8px;" onclick="cancelarEdicion()">Cancelar edición</button>
       </div>
     </div>
   </div>
@@ -373,6 +405,8 @@
 
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbxzLSTmN53pMhOr56GIzAeJjhxn_U7e8JOjmebUfk7NrtluBg-O2EFRBhVqcD2B-exE/exec';
 const PAYDAY = 28;
@@ -380,10 +414,12 @@ const PAYDAY = 28;
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
-let allData     = [];
-let tipo        = 'egreso';
-let mesOffset   = 0; // 0 = mes actual, -1 = mes anterior, etc.
+let allData      = [];
+let tipo         = 'egreso';
+let mesOffset    = 0; // 0 = mes actual, -1 = mes anterior, etc.
 let listaAbierta = false;
+let editandoId   = null;
+let toastTimeout = null;
 
 const ahora = new Date();
 
@@ -415,6 +451,14 @@ function setSync(state) {
   const map = { syncing:['Sincronizando…','syncing'], ok:['Sincronizado ✓','ok'], error:['Sin conexión','error'] };
   el.textContent = map[state][0];
   el.className = 'sync-indicator ' + map[state][1];
+}
+
+function mostrarToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('visible'), 2200);
 }
 
 function setTipo(t) {
@@ -469,27 +513,40 @@ function calcNetoPeriodo(inicioStr, finStr) {
 
 function actualizarDisponible() {
   const sueldo = getSueldo();
-  const { fin, inicioStr, finStr } = getPeriodoPago();
+  const { inicio, fin, inicioStr, finStr } = getPeriodoPago();
   const gastado   = calcNetoPeriodo(inicioStr, finStr);
   const restante  = sueldo - gastado;
 
+  const inicioMed = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
   const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
   const finMed = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
   const diasRestantes = Math.max(1, Math.round((finMed - hoyMed) / 86400000) + 1);
   const porDia = restante / diasRestantes;
 
-  const el      = document.getElementById('disponible-amount');
-  const subEl   = document.getElementById('disponible-sub');
-  const tarjeta = document.getElementById('disponible-card');
+  const el       = document.getElementById('disponible-amount');
+  const subEl    = document.getElementById('disponible-sub');
+  const tarjeta  = document.getElementById('disponible-card');
+  const progWrap = document.getElementById('disponible-progress-wrap');
+  const progBar  = document.getElementById('disponible-progress-bar');
+  const progLbl  = document.getElementById('disponible-progress-label');
 
   if (sueldo <= 0) {
     el.textContent = '—';
     tarjeta.classList.remove('negativo');
     subEl.textContent = 'Configura tu sueldo mensual para calcularlo';
+    progWrap.style.display = 'none';
   } else {
     el.textContent = fmt(porDia);
     tarjeta.classList.toggle('negativo', porDia < 0);
     subEl.textContent = `${fmt(restante)} disponibles · ${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
+
+    const diasTotales = Math.round((finMed - inicioMed) / 86400000) + 1;
+    const diaActual   = diasTotales - diasRestantes + 1;
+    const pctGastado  = Math.min(100, Math.max(0, Math.round((gastado / sueldo) * 100)));
+
+    progWrap.style.display = 'block';
+    progBar.style.width = pctGastado + '%';
+    progLbl.textContent = `Día ${diaActual} de ${diasTotales} del período · ${pctGastado}% del sueldo gastado`;
   }
 
   const inputSueldo = document.getElementById('input-sueldo');
@@ -507,6 +564,7 @@ async function setSueldo() {
   if (isNaN(v) || v < 0) return;
   await post({ action: 'set_inicial', mes: 'SUELDO', value: v });
   document.getElementById('sueldo-form').classList.remove('visible');
+  mostrarToast('Sueldo actualizado ✓');
 }
 
 function toggleLista() {
@@ -525,14 +583,18 @@ function cambiarMes(dir) {
   actualizarUI();
 }
 
+async function enviar(payload) {
+  await fetch(API, {
+    method: 'POST', mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+}
+
 async function post(payload) {
   setSync('syncing');
   try {
-    await fetch(API, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    await enviar(payload);
     await cargar();
     setSync('ok');
   } catch(e) { setSync('error'); }
@@ -598,7 +660,7 @@ function actualizarUI() {
     lista.innerHTML = movs.map(m => `
       <div class="movimiento">
         <div class="mov-dot ${m[1]}"></div>
-        <div class="mov-info">
+        <div class="mov-info${esHoy ? ' editable' : ''}"${esHoy ? ` onclick="iniciarEdicion('${m[0]}')"` : ''}>
           <div class="mov-desc">${m[2]}</div>
           <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${m[1]}</div>
         </div>
@@ -621,22 +683,65 @@ async function agregar() {
   const btn = document.getElementById('btn-agregar');
   btn.disabled = true; btn.textContent = 'Guardando...';
 
+  const esEdicion = !!editandoId;
+
+  if (esEdicion) {
+    const original = allData.find(r => String(r[0]) === String(editandoId));
+    const fecha = original ? String(original[4]) : toDateStr(new Date());
+    setSync('syncing');
+    try {
+      await enviar({ action: 'delete', id: editandoId });
+      await enviar({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
+      await cargar();
+      setSync('ok');
+    } catch(e) { setSync('error'); }
+    cancelarEdicion();
+  } else {
+    document.getElementById('input-desc').value  = '';
+    document.getElementById('input-monto').value = '';
+    const fecha = toDateStr(new Date());
+    await post({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Agregar';
+  mostrarToast(esEdicion ? 'Movimiento actualizado ✓' : 'Gasto agregado ✓');
+}
+
+function iniciarEdicion(id) {
+  const row = allData.find(r => String(r[0]) === String(id));
+  if (!row) return;
+
+  editandoId = id;
+  setTipo(row[1]);
+  document.getElementById('input-desc').value  = row[2];
+  document.getElementById('input-monto').value = row[3];
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('btn-agregar').textContent = 'Guardar cambios';
+  document.getElementById('btn-cancelar-edicion').style.display = 'block';
+
+  document.getElementById('bloque-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('input-desc').focus();
+}
+
+function cancelarEdicion() {
+  editandoId = null;
   document.getElementById('input-desc').value  = '';
   document.getElementById('input-monto').value = '';
-
-  const fecha = toDateStr(new Date());
-  await post({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
-
-  btn.disabled = false; btn.textContent = 'Agregar';
+  document.getElementById('btn-agregar').textContent = 'Agregar';
+  document.getElementById('btn-cancelar-edicion').style.display = 'none';
+  setTipo('egreso');
 }
 
 async function eliminar(id) {
   await post({ action: 'delete', id });
+  mostrarToast('Movimiento eliminado');
 }
 
 async function limpiar() {
   if (!confirm('¿Borrar todos los movimientos de este mes?')) return;
   await post({ action: 'clear', mes: getMesActual().key });
+  mostrarToast('Movimientos borrados');
 }
 
 function trazarRectRedondeado(ctx, x, y, w, h, r) {
