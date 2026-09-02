@@ -210,6 +210,42 @@
   .categoria-btn.cat-suscripciones.active  { background: #6366f1; }
   .categoria-btn.cat-otros.active          { background: #64748b; }
 
+  .ocr-status { font-size: 13px; color: var(--text2); text-align: center; padding: 10px 0 0; }
+  .ocr-hint   { font-size: 11px; color: var(--text3); margin-top: 6px; text-align: center; }
+
+  .ocr-row {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ocr-row-top { display: flex; align-items: center; gap: 6px; }
+  .ocr-row-top input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
+  .ocr-row-top input.ocr-desc { flex: 1; width: auto; }
+  .ocr-row-top input.ocr-monto { width: 92px; flex-shrink: 0; }
+  .ocr-row-bottom { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ocr-row-bottom select,
+  .ocr-row-bottom input[type="date"] {
+    flex: 1; min-width: 90px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .ocr-row-remove {
+    background: none; border: none; color: var(--text3);
+    font-size: 14px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
+  }
+
+  .ocr-acciones { display: none; gap: 8px; margin-top: 10px; }
+  .ocr-acciones .btn-primary { margin-top: 0; }
+
   .section {
     background: var(--surface);
     border-radius: var(--radius);
@@ -414,6 +450,21 @@
         <button class="btn-ghost" id="btn-cancelar-edicion" style="display:none; width:100%; margin-top:8px;" onclick="cancelarEdicion()">Cancelar edición</button>
       </div>
     </div>
+
+    <div class="section">
+      <div class="section-header">Importar desde foto</div>
+      <div class="section-body">
+        <input type="file" accept="image/*" capture="environment" id="input-foto" style="display:none" onchange="procesarFoto(event)" />
+        <button class="btn-ghost" style="width:100%;" onclick="document.getElementById('input-foto').click()">📷 Elegir o tomar foto</button>
+        <p class="ocr-hint">Funciona mejor con listas ordenadas de movimientos (como un estado de cuenta). Vas a poder revisar y corregir todo antes de guardar.</p>
+        <p class="ocr-status" id="ocr-status" style="display:none;"></p>
+        <div id="ocr-preview"></div>
+        <div class="ocr-acciones" id="ocr-acciones">
+          <button class="btn-primary" id="btn-ocr-confirmar" onclick="confirmarImportacionOcr()">Agregar movimientos</button>
+          <button class="btn-ghost" onclick="cancelarImportacionOcr()">Cancelar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="readonly-notice" id="readonly-notice" style="display:none;">
@@ -442,6 +493,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbxzLSTmN53pMhOr56GIzAeJjhxn_U7e8JOjmebUfk7NrtluBg-O2EFRBhVqcD2B-exE/exec';
 const PAYDAY = 28;
@@ -505,6 +557,135 @@ function extraerCategoria(descRaw) {
     return { desc: String(descRaw).slice(0, m.index), catId: m[1] };
   }
   return { desc: String(descRaw), catId: null };
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Busca en cada línea del texto un monto ($12.345, -12.345, +5000, etc.)
+// y usa el resto de la línea como descripción. Heurística simple: pensada
+// para revisar y corregir, no para acertar siempre.
+function parsearMovimientosOcr(texto) {
+  const RE_MONTO = /([-+])?\s?\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{3,})(?!\d)/;
+  const lineas = String(texto).split('\n').map(l => l.trim()).filter(Boolean);
+  const filas = [];
+
+  for (const linea of lineas) {
+    const m = linea.match(RE_MONTO);
+    if (!m) continue;
+
+    const monto = parseInt(m[2].replace(/[.,]/g, ''), 10);
+    if (!monto || monto <= 0) continue;
+
+    let desc = (linea.slice(0, m.index) + linea.slice(m.index + m[0].length))
+      .replace(/[·:|_\-–]+$/, '')
+      .replace(/^[·:|_\-–]+/, '')
+      .trim();
+    if (!desc) desc = 'Movimiento';
+
+    filas.push({ desc, monto, tipo: m[1] === '+' ? 'ingreso' : 'egreso', categoria: 'otros', fecha: hoyStr });
+  }
+
+  return filas;
+}
+
+function filaOcrHtml(fila) {
+  const optsCat = CATEGORIAS.map(c =>
+    `<option value="${c.id}"${fila.categoria === c.id ? ' selected' : ''}>${c.emoji} ${c.label}</option>`
+  ).join('');
+
+  return `
+    <div class="ocr-row">
+      <div class="ocr-row-top">
+        <input type="checkbox" class="ocr-check" checked>
+        <input type="text" class="ocr-desc" value="${escapeAttr(fila.desc)}" placeholder="Descripción">
+        <input type="number" class="ocr-monto" value="${fila.monto}" min="0">
+      </div>
+      <div class="ocr-row-bottom">
+        <input type="date" class="ocr-fecha" value="${fila.fecha}">
+        <select class="ocr-tipo">
+          <option value="egreso"${fila.tipo === 'egreso' ? ' selected' : ''}>Egreso</option>
+          <option value="ingreso"${fila.tipo === 'ingreso' ? ' selected' : ''}>Ingreso</option>
+        </select>
+        <select class="ocr-cat">${optsCat}</select>
+        <button type="button" class="ocr-row-remove" onclick="this.closest('.ocr-row').remove()">✕</button>
+      </div>
+    </div>
+  `;
+}
+
+async function procesarFoto(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  const estado   = document.getElementById('ocr-status');
+  const preview  = document.getElementById('ocr-preview');
+  const acciones = document.getElementById('ocr-acciones');
+
+  preview.innerHTML = '';
+  acciones.style.display = 'none';
+  estado.style.display = 'block';
+  estado.textContent = 'Leyendo imagen…';
+
+  try {
+    const worker = await Tesseract.createWorker('spa');
+    const { data: { text } } = await worker.recognize(file);
+    await worker.terminate();
+
+    let filas = parsearMovimientosOcr(text);
+
+    if (filas.length === 0) {
+      estado.textContent = 'No detectamos montos en la imagen. Agrega el movimiento a mano abajo o intenta con otra foto.';
+      filas = [{ desc: '', monto: '', tipo: 'egreso', categoria: 'otros', fecha: hoyStr }];
+    } else {
+      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'}. Revisa antes de guardar:`;
+    }
+
+    preview.innerHTML = filas.map(filaOcrHtml).join('');
+    acciones.style.display = 'flex';
+  } catch (e) {
+    estado.textContent = 'No pudimos leer la imagen. Intenta con otra foto más nítida.';
+  }
+}
+
+async function confirmarImportacionOcr() {
+  const filas = [...document.querySelectorAll('#ocr-preview .ocr-row')];
+  const btn = document.getElementById('btn-ocr-confirmar');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  let agregados = 0;
+  setSync('syncing');
+  try {
+    for (let i = 0; i < filas.length; i++) {
+      const fila = filas[i];
+      if (!fila.querySelector('.ocr-check').checked) continue;
+
+      const desc      = fila.querySelector('.ocr-desc').value.trim();
+      const monto      = parseFloat(fila.querySelector('.ocr-monto').value);
+      const tipoFila   = fila.querySelector('.ocr-tipo').value;
+      const catFila    = fila.querySelector('.ocr-cat').value;
+      const fechaFila  = fila.querySelector('.ocr-fecha').value || hoyStr;
+      if (!desc || isNaN(monto) || monto <= 0) continue;
+
+      const descFinal = codificarDesc(desc, tipoFila, catFila);
+      await enviar({ action: 'add', id: Date.now() + i, tipo: tipoFila, desc: descFinal, monto, fecha: fechaFila });
+      agregados++;
+    }
+    await cargar();
+    setSync('ok');
+  } catch (e) { setSync('error'); }
+
+  btn.disabled = false; btn.textContent = 'Agregar movimientos';
+  cancelarImportacionOcr();
+  mostrarToast(agregados > 0 ? `${agregados} movimiento${agregados === 1 ? '' : 's'} importado${agregados === 1 ? '' : 's'} ✓` : 'No se agregó ningún movimiento');
+}
+
+function cancelarImportacionOcr() {
+  document.getElementById('ocr-preview').innerHTML = '';
+  document.getElementById('ocr-acciones').style.display = 'none';
+  document.getElementById('ocr-status').style.display = 'none';
 }
 
 function setSync(state) {
