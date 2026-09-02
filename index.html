@@ -454,7 +454,7 @@
     <div class="section">
       <div class="section-header">Importar desde foto</div>
       <div class="section-body">
-        <input type="file" accept="image/*" capture="environment" id="input-foto" style="display:none" onchange="procesarFoto(event)" />
+        <input type="file" accept="image/*" id="input-foto" style="display:none" onchange="procesarFoto(event)" />
         <button class="btn-ghost" style="width:100%;" onclick="document.getElementById('input-foto').click()">📷 Elegir o tomar foto</button>
         <p class="ocr-hint">Funciona mejor con listas ordenadas de movimientos (como un estado de cuenta). Vas a poder revisar y corregir todo antes de guardar.</p>
         <p class="ocr-status" id="ocr-status" style="display:none;"></p>
