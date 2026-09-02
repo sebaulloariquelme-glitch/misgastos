@@ -143,18 +143,6 @@
     width: auto; margin-top: 0; padding: 9px 14px; white-space: nowrap;
   }
 
-  .saldo-card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    text-align: center;
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--border);
-  }
-  .saldo-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
-  .saldo-amount { font-size: 32px; font-weight: 600; letter-spacing: -1px; }
-  .saldo-amount.negativo { color: var(--red); }
-
   .metrics {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -323,11 +311,6 @@
     </div>
   </div>
 
-  <div class="saldo-card">
-    <div class="saldo-label">neto del mes</div>
-    <div class="saldo-amount" id="total-mes">$0</div>
-  </div>
-
   <div class="metrics">
     <div class="metric">
       <div class="metric-label">ingresos</div>
@@ -367,7 +350,7 @@
   <div class="section" id="seccion-lista" style="display:none;">
     <div class="lista-header">
       <span class="lista-title" id="lista-titulo">Movimientos</span>
-      <button class="btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="descargarExcel()">⬇ Excel</button>
+      <button class="btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="descargarResumenImagen()">⬇ Imagen</button>
     </div>
     <div id="lista"></div>
     <div class="actions" id="acciones-lista">
@@ -379,7 +362,6 @@
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbxzLSTmN53pMhOr56GIzAeJjhxn_U7e8JOjmebUfk7NrtluBg-O2EFRBhVqcD2B-exE/exec';
 const PAYDAY = 28;
@@ -561,20 +543,21 @@ function actualizarUI() {
   document.getElementById('readonly-notice').style.display   = esHoy ? 'none' : 'block';
   document.getElementById('acciones-lista').style.display    = esHoy ? 'flex' : 'none';
 
-  // Ingresos, egresos y neto del mes que se está viendo
-  const { ingresos, egresos, neto } = calcMovimientosMes(mes.key);
-  const totalEl = document.getElementById('total-mes');
-  totalEl.textContent = fmt(neto);
-  totalEl.className   = 'saldo-amount' + (neto > 0 ? ' negativo' : '');
+  // Ingresos y egresos del mes que se está viendo
+  const { ingresos, egresos } = calcMovimientosMes(mes.key);
   document.getElementById('lbl-ingresos').textContent = fmt(ingresos);
   document.getElementById('lbl-egresos').textContent  = fmt(egresos);
 
   // Monto disponible por día (siempre referido a hoy, independiente del mes que se navega)
   actualizarDisponible();
 
-  // Lista de gastos del mes
+  // Lista de movimientos del mes: más reciente primero (por fecha y, si empatan, por orden de registro)
   const movs = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key))
-    .sort((a,b) => String(b[4]).localeCompare(String(a[4])));
+    .sort((a,b) => {
+      const porFecha = String(b[4]).localeCompare(String(a[4]));
+      if (porFecha !== 0) return porFecha;
+      return (parseFloat(b[0]) || 0) - (parseFloat(a[0]) || 0);
+    });
 
   const lista   = document.getElementById('lista');
   const vacio   = document.getElementById('vacio');
@@ -632,31 +615,94 @@ async function limpiar() {
   await post({ action: 'clear', mes: getMesActual().key });
 }
 
-function descargarExcel() {
+function trazarRectRedondeado(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function descargarResumenImagen() {
   const mes  = getMesActual();
-  const movs = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key))
-    .sort((a,b) => String(a[4]).localeCompare(String(b[4])));
+  const { ingresos, egresos, neto } = calcMovimientosMes(mes.key);
+  const cantidad = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key)).length;
 
-  if (movs.length === 0) { alert('No hay movimientos para descargar este mes.'); return; }
+  if (cantidad === 0) { alert('No hay movimientos para resumir este mes.'); return; }
 
-  const datos = [['Fecha', 'Descripción', 'Tipo', 'Monto']];
-  let ingresos = 0, egresos = 0;
-  movs.forEach(m => {
-    const monto = parseFloat(m[3]) || 0;
-    if (m[1] === 'ingreso') ingresos += monto; else egresos += monto;
-    datos.push([String(m[4]), m[2], m[1] === 'ingreso' ? 'Ingreso' : 'Egreso', monto]);
+  const W = 800, H = 520, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#f5f5f0';
+  ctx.fillRect(0, 0, W, H);
+
+  trazarRectRedondeado(ctx, cardX, cardY, cardW, cardH, 24);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+  ctx.stroke();
+
+  const left = cardX + 44;
+  let y = cardY + 60;
+
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = '600 22px -apple-system, "Segoe UI", sans-serif';
+  ctx.fillText('Mi Caja', left, y);
+
+  y += 28;
+  ctx.fillStyle = '#666';
+  ctx.font = '400 16px -apple-system, "Segoe UI", sans-serif';
+  ctx.fillText(`Resumen de ${MESES[mes.month]} ${mes.year}`, left, y);
+
+  y += 80;
+  ctx.font = '700 48px -apple-system, "Segoe UI", sans-serif';
+  ctx.fillStyle = neto > 0 ? '#dc2626' : '#16a34a';
+  ctx.fillText(fmt(neto), left, y);
+
+  y += 24;
+  ctx.font = '400 13px -apple-system, "Segoe UI", sans-serif';
+  ctx.fillStyle = '#999';
+  ctx.fillText(neto > 0 ? 'gastado neto este mes' : 'ahorro neto este mes', left, y);
+
+  const filas = [
+    ['Ingresos', fmt(ingresos), '#16a34a'],
+    ['Egresos', fmt(egresos), '#dc2626'],
+    ['Movimientos', String(cantidad), '#1a1a1a'],
+  ];
+
+  y += 50;
+  const rightX = cardX + cardW - 44;
+  filas.forEach(([label, valor, color]) => {
+    ctx.textAlign = 'left';
+    ctx.font = '400 15px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#666';
+    ctx.fillText(label, left, y);
+
+    ctx.textAlign = 'right';
+    ctx.font = '600 18px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = color;
+    ctx.fillText(valor, rightX, y);
+    ctx.textAlign = 'left';
+
+    y += 38;
   });
-  datos.push([]);
-  datos.push(['', '', 'Total ingresos', ingresos]);
-  datos.push(['', '', 'Total egresos', egresos]);
-  datos.push(['', '', 'Neto (egresos − ingresos)', egresos - ingresos]);
 
-  const ws = XLSX.utils.aoa_to_sheet(datos);
-  ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 14 }, { wch: 14 }];
+  ctx.font = '400 12px -apple-system, "Segoe UI", sans-serif';
+  ctx.fillStyle = '#999';
+  ctx.fillText(`Generado el ${fmtFecha(hoyStr)}`, left, cardY + cardH - 24);
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, `${MESES[mes.month]} ${mes.year}`.slice(0, 31));
-  XLSX.writeFile(wb, `movimientos-${mes.key}.xlsx`);
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `resumen-${mes.key}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 setTipo('egreso');
