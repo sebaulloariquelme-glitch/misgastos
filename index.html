@@ -120,20 +120,25 @@
   .main { padding: 1rem 1rem 0; max-width: 480px; margin: 0 auto; }
 
   .disponible-card {
-    background: var(--surface);
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
     border-radius: var(--radius);
     padding: 1.25rem;
     text-align: center;
     margin-bottom: 0.75rem;
-    border: 1px solid var(--accent);
+    border: none;
+    box-shadow: 0 6px 18px rgba(37,99,235,0.28);
   }
-  .disponible-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
-  .disponible-amount { font-size: 34px; font-weight: 700; letter-spacing: -1px; color: var(--accent); }
-  .disponible-amount.negativo { color: var(--red); }
-  .disponible-sub { font-size: 12px; color: var(--text3); margin-top: 8px; }
+  .disponible-card.negativo {
+    background: linear-gradient(135deg, var(--red), #b91c1c);
+    box-shadow: 0 6px 18px rgba(220,38,38,0.28);
+  }
+  .disponible-label { font-size: 11px; color: rgba(255,255,255,0.75); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .disponible-amount { font-size: 34px; font-weight: 700; letter-spacing: -1px; color: #fff; }
+  .disponible-sub { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 8px; }
   .disponible-edit-link {
-    font-size: 12px; color: var(--accent); background: none; border: none;
+    font-size: 12px; color: #fff; background: none; border: none;
     cursor: pointer; margin-top: 10px; font-family: inherit; text-decoration: underline;
+    opacity: 0.9;
   }
 
   .sueldo-form { display: none; gap: 8px; margin-top: 10px; }
@@ -235,6 +240,9 @@
   }
   .lista-title { font-size: 13px; font-weight: 500; color: var(--text2); }
 
+  #seccion-lista.colapsada #lista,
+  #seccion-lista.colapsada #acciones-lista { display: none; }
+
   .movimiento {
     display: flex; align-items: center; gap: 10px;
     padding: 0.875rem 1rem;
@@ -300,7 +308,7 @@
 
 <div class="main">
 
-  <div class="disponible-card">
+  <div class="disponible-card" id="disponible-card">
     <div class="disponible-label">Monto disponible por día</div>
     <div class="disponible-amount" id="disponible-amount">$0</div>
     <div class="disponible-sub" id="disponible-sub"></div>
@@ -350,7 +358,10 @@
   <div class="section" id="seccion-lista" style="display:none;">
     <div class="lista-header">
       <span class="lista-title" id="lista-titulo">Movimientos</span>
-      <button class="btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="descargarResumenImagen()">⬇ Imagen</button>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="descargarResumenImagen()">⬇ Imagen</button>
+        <button class="btn-ghost" id="btn-toggle-lista" style="padding:5px 10px;font-size:12px;" onclick="toggleLista()">▾</button>
+      </div>
     </div>
     <div id="lista"></div>
     <div class="actions" id="acciones-lista">
@@ -369,9 +380,10 @@ const PAYDAY = 28;
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
-let allData    = [];
-let tipo       = 'egreso';
-let mesOffset  = 0; // 0 = mes actual, -1 = mes anterior, etc.
+let allData     = [];
+let tipo        = 'egreso';
+let mesOffset   = 0; // 0 = mes actual, -1 = mes anterior, etc.
+let listaAbierta = false;
 
 const ahora = new Date();
 
@@ -466,16 +478,17 @@ function actualizarDisponible() {
   const diasRestantes = Math.max(1, Math.round((finMed - hoyMed) / 86400000) + 1);
   const porDia = restante / diasRestantes;
 
-  const el    = document.getElementById('disponible-amount');
-  const subEl = document.getElementById('disponible-sub');
+  const el      = document.getElementById('disponible-amount');
+  const subEl   = document.getElementById('disponible-sub');
+  const tarjeta = document.getElementById('disponible-card');
 
   if (sueldo <= 0) {
     el.textContent = '—';
-    el.className   = 'disponible-amount';
+    tarjeta.classList.remove('negativo');
     subEl.textContent = 'Configura tu sueldo mensual para calcularlo';
   } else {
     el.textContent = fmt(porDia);
-    el.className   = 'disponible-amount' + (porDia < 0 ? ' negativo' : '');
+    tarjeta.classList.toggle('negativo', porDia < 0);
     subEl.textContent = `${fmt(restante)} disponibles · ${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
   }
 
@@ -494,6 +507,16 @@ async function setSueldo() {
   if (isNaN(v) || v < 0) return;
   await post({ action: 'set_inicial', mes: 'SUELDO', value: v });
   document.getElementById('sueldo-form').classList.remove('visible');
+}
+
+function toggleLista() {
+  listaAbierta = !listaAbierta;
+  aplicarEstadoLista();
+}
+
+function aplicarEstadoLista() {
+  document.getElementById('seccion-lista').classList.toggle('colapsada', !listaAbierta);
+  document.getElementById('btn-toggle-lista').textContent = listaAbierta ? '▴' : '▾';
 }
 
 function cambiarMes(dir) {
@@ -583,6 +606,7 @@ function actualizarUI() {
         ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
       </div>
     `).join('');
+    aplicarEstadoLista();
   }
 }
 
