@@ -190,6 +190,26 @@
   .tipo-btn.active-ingreso { background: var(--green-bg); color: var(--green); border-color: var(--green); }
   .tipo-btn.active-egreso  { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
 
+  .categoria-toggle { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .categoria-btn {
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+  }
+  .categoria-btn.active { color: #fff; border-color: transparent; }
+  .categoria-btn.cat-comida.active         { background: #f59e0b; }
+  .categoria-btn.cat-transporte.active     { background: #0ea5e9; }
+  .categoria-btn.cat-vivienda.active       { background: #8b5cf6; }
+  .categoria-btn.cat-ocio.active           { background: #ec4899; }
+  .categoria-btn.cat-ropa.active           { background: #14b8a6; }
+  .categoria-btn.cat-salud.active          { background: #ef4444; }
+  .categoria-btn.cat-suscripciones.active  { background: #6366f1; }
+  .categoria-btn.cat-otros.active          { background: #64748b; }
+
   .section {
     background: var(--surface);
     border-radius: var(--radius);
@@ -375,6 +395,16 @@
           <button class="tipo-btn" id="btn-ingreso" onclick="setTipo('ingreso')">+ Ingreso</button>
           <button class="tipo-btn active-egreso" id="btn-egreso" onclick="setTipo('egreso')">− Egreso</button>
         </div>
+        <div class="categoria-toggle" id="categoria-toggle">
+          <button class="categoria-btn cat-comida" onclick="setCategoria('comida')">🍽️ Comida</button>
+          <button class="categoria-btn cat-transporte" onclick="setCategoria('transporte')">🚌 Transporte</button>
+          <button class="categoria-btn cat-vivienda" onclick="setCategoria('vivienda')">🏠 Vivienda</button>
+          <button class="categoria-btn cat-ocio" onclick="setCategoria('ocio')">🎉 Ocio</button>
+          <button class="categoria-btn cat-ropa" onclick="setCategoria('ropa')">👕 Ropa</button>
+          <button class="categoria-btn cat-salud" onclick="setCategoria('salud')">💊 Salud</button>
+          <button class="categoria-btn cat-suscripciones" onclick="setCategoria('suscripciones')">🔁 Suscripciones</button>
+          <button class="categoria-btn cat-otros" onclick="setCategoria('otros')">🎁 Otros</button>
+        </div>
         <input type="text" id="input-desc" placeholder="Descripción" />
         <div class="row">
           <input type="number" id="input-monto" placeholder="Monto" min="0" />
@@ -419,8 +449,20 @@ const PAYDAY = 28;
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
+const CATEGORIAS = [
+  { id: 'comida',         label: 'Comida',         emoji: '🍽️' },
+  { id: 'transporte',     label: 'Transporte',     emoji: '🚌' },
+  { id: 'vivienda',       label: 'Vivienda',       emoji: '🏠' },
+  { id: 'ocio',           label: 'Ocio',           emoji: '🎉' },
+  { id: 'ropa',           label: 'Ropa',           emoji: '👕' },
+  { id: 'salud',          label: 'Salud',          emoji: '💊' },
+  { id: 'suscripciones',  label: 'Suscripciones',  emoji: '🔁' },
+  { id: 'otros',          label: 'Otros',          emoji: '🎁' },
+];
+
 let allData      = [];
 let tipo         = 'egreso';
+let categoria    = 'otros';
 let mesOffset    = 0; // 0 = mes actual, -1 = mes anterior, etc.
 let listaAbierta = false;
 let editandoId   = null;
@@ -451,6 +493,20 @@ function fmtFecha(str) {
   return `${parseInt(d)} ${MESES[parseInt(m)-1].toLowerCase().slice(0,3)} ${y}`;
 }
 
+// La categoría se guarda como una etiqueta " #id" al final de la descripción,
+// ya que la planilla no tiene una columna propia para categorías.
+function codificarDesc(desc, tipoMov, catId) {
+  return tipoMov === 'egreso' ? `${desc} #${catId}` : desc;
+}
+
+function extraerCategoria(descRaw) {
+  const m = String(descRaw).match(/ #([a-z]+)$/);
+  if (m && CATEGORIAS.some(c => c.id === m[1])) {
+    return { desc: String(descRaw).slice(0, m.index), catId: m[1] };
+  }
+  return { desc: String(descRaw), catId: null };
+}
+
 function setSync(state) {
   const el = document.getElementById('sync-indicator');
   const map = { syncing:['Sincronizando…','syncing'], ok:['Sincronizado ✓','ok'], error:['Sin conexión','error'] };
@@ -470,6 +526,14 @@ function setTipo(t) {
   tipo = t;
   document.getElementById('btn-ingreso').className = 'tipo-btn' + (t==='ingreso'?' active-ingreso':'');
   document.getElementById('btn-egreso').className  = 'tipo-btn' + (t==='egreso' ?' active-egreso':'');
+  document.getElementById('categoria-toggle').style.display = t === 'egreso' ? 'flex' : 'none';
+}
+
+function setCategoria(catId) {
+  categoria = catId;
+  document.querySelectorAll('#categoria-toggle .categoria-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.classList.contains('cat-' + catId));
+  });
 }
 
 function calcMovimientosMes(mesKey) {
@@ -662,17 +726,22 @@ function actualizarUI() {
   } else {
     vacio.style.display   = 'none';
     seccion.style.display = 'block';
-    lista.innerHTML = movs.map(m => `
+    lista.innerHTML = movs.map(m => {
+      const { desc, catId } = extraerCategoria(m[2]);
+      const cat = CATEGORIAS.find(c => c.id === catId);
+      const etiqueta = cat ? `${cat.emoji} ${cat.label}` : (m[1] === 'ingreso' ? 'Ingreso' : 'Egreso');
+      return `
       <div class="movimiento">
         <div class="mov-dot ${m[1]}"></div>
         <div class="mov-info${esHoy ? ' editable' : ''}"${esHoy ? ` onclick="iniciarEdicion('${m[0]}')"` : ''}>
-          <div class="mov-desc">${m[2]}</div>
-          <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${m[1]}</div>
+          <div class="mov-desc">${desc}</div>
+          <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${etiqueta}</div>
         </div>
         <div class="mov-amount ${m[1]}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
         ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
     aplicarEstadoLista();
   }
 }
@@ -689,6 +758,7 @@ async function agregar() {
   btn.disabled = true; btn.textContent = 'Guardando...';
 
   const esEdicion = !!editandoId;
+  const descFinal = codificarDesc(desc, tipo, categoria);
 
   if (esEdicion) {
     const original = allData.find(r => String(r[0]) === String(editandoId));
@@ -696,7 +766,7 @@ async function agregar() {
     setSync('syncing');
     try {
       await enviar({ action: 'delete', id: editandoId });
-      await enviar({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
+      await enviar({ action: 'add', id: Date.now(), tipo, desc: descFinal, monto, fecha });
       await cargar();
       setSync('ok');
     } catch(e) { setSync('error'); }
@@ -705,7 +775,7 @@ async function agregar() {
     document.getElementById('input-desc').value  = '';
     document.getElementById('input-monto').value = '';
     const fecha = toDateStr(new Date());
-    await post({ action: 'add', id: Date.now(), tipo, desc, monto, fecha });
+    await post({ action: 'add', id: Date.now(), tipo, desc: descFinal, monto, fecha });
   }
 
   btn.disabled = false;
@@ -717,9 +787,12 @@ function iniciarEdicion(id) {
   const row = allData.find(r => String(r[0]) === String(id));
   if (!row) return;
 
+  const { desc, catId } = extraerCategoria(row[2]);
+
   editandoId = id;
   setTipo(row[1]);
-  document.getElementById('input-desc').value  = row[2];
+  setCategoria(catId || 'otros');
+  document.getElementById('input-desc').value  = desc;
   document.getElementById('input-monto').value = row[3];
   document.getElementById('error').style.display = 'none';
   document.getElementById('btn-agregar').textContent = 'Guardar cambios';
@@ -736,6 +809,7 @@ function cancelarEdicion() {
   document.getElementById('btn-agregar').textContent = 'Agregar';
   document.getElementById('btn-cancelar-edicion').style.display = 'none';
   setTipo('egreso');
+  setCategoria('otros');
 }
 
 async function eliminar(id) {
@@ -845,6 +919,7 @@ function descargarResumenImagen() {
 }
 
 setTipo('egreso');
+setCategoria('otros');
 cargar();
 setInterval(cargar, 30000);
 
