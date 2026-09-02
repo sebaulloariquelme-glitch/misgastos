@@ -632,7 +632,11 @@ function descargarResumenImagen() {
 
   if (cantidad === 0) { alert('No hay movimientos para resumir este mes.'); return; }
 
-  const W = 800, H = 520, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
+  const sueldo = getSueldo();
+  const { inicioStr, finStr } = getPeriodoPago();
+  const saldoFinal = sueldo - calcNetoPeriodo(inicioStr, finStr);
+
+  const W = 800, H = 610, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -669,6 +673,8 @@ function descargarResumenImagen() {
   ctx.fillText(neto > 0 ? 'gastado neto este mes' : 'ahorro neto este mes', left, y);
 
   const filas = [
+    ['Saldo disponible', sueldo > 0 ? fmt(sueldo) : '—', '#2563eb'],
+    ['Saldo final', sueldo > 0 ? fmt(saldoFinal) : '—', saldoFinal < 0 ? '#dc2626' : '#16a34a'],
     ['Ingresos', fmt(ingresos), '#16a34a'],
     ['Egresos', fmt(egresos), '#dc2626'],
     ['Movimientos', String(cantidad), '#1a1a1a'],
