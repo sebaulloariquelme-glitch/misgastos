@@ -563,28 +563,94 @@ function escapeAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Busca en cada línea del texto un monto ($12.345, -12.345, +5000, etc.)
-// y usa el resto de la línea como descripción. Heurística simple: pensada
-// para revisar y corregir, no para acertar siempre.
+const DIAS_HEADER = ['domingo','lunes','martes','miércoles','miercoles','jueves','viernes','sábado','sabado'];
+
+function esEncabezadoFecha(linea) {
+  const l = linea.toLowerCase().trim();
+  return l === 'hoy' || l === 'ayer' || DIAS_HEADER.some(d => l.startsWith(d));
+}
+
+// Convierte encabezados tipo "Hoy", "Ayer" o "Jueves 03 de septiembre" a YYYY-MM-DD.
+function fechaDesdeEncabezado(linea) {
+  const l = linea.toLowerCase().trim();
+  if (l === 'hoy') return hoyStr;
+  if (l === 'ayer') {
+    const d = new Date(ahora);
+    d.setDate(d.getDate() - 1);
+    return toDateStr(d);
+  }
+  const m = l.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)/i);
+  if (m) {
+    const dia = parseInt(m[1], 10);
+    const mesIdx = MESES.findIndex(mm => mm.toLowerCase() === m[2].toLowerCase());
+    if (mesIdx >= 0) {
+      let anio = ahora.getFullYear();
+      if (mesIdx > ahora.getMonth()) anio -= 1; // mes "futuro" respecto a hoy = año anterior
+      return `${anio}-${pad(mesIdx + 1)}-${pad(dia)}`;
+    }
+  }
+  return null;
+}
+
+// El monto SIEMPRE debe venir precedido de un + o - explícito (así se ignoran
+// líneas como "Saldo: $654.137", que no tienen signo). El símbolo de moneda
+// es opcional y tolera que el OCR confunda "$" con "S"/"s"/"5".
+const RE_MONTO_SOLO   = /^([+\-])\s?[\$Ss5]?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*$/;
+const RE_MONTO_INLINE = /([+\-])\s?[\$Ss5]?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/;
+
+// Recorre el texto del OCR línea por línea. Las líneas de fecha ("Hoy",
+// "Jueves 03 de septiembre") marcan la fecha de los movimientos que siguen;
+// las líneas "Saldo: ..." se ignoran; el resto de líneas antes de un monto
+// se van juntando como descripción. Heurística simple, pensada para
+// revisar y corregir, no para acertar siempre.
 function parsearMovimientosOcr(texto) {
-  const RE_MONTO = /([-+])?\s?\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{3,})(?!\d)/;
   const lineas = String(texto).split('\n').map(l => l.trim()).filter(Boolean);
   const filas = [];
+  let buffer = [];
+  let fechaActual = hoyStr;
 
   for (const linea of lineas) {
-    const m = linea.match(RE_MONTO);
-    if (!m) continue;
+    if (/^saldo\b/i.test(linea)) continue;
 
-    const monto = parseInt(m[2].replace(/[.,]/g, ''), 10);
-    if (!monto || monto <= 0) continue;
+    if (esEncabezadoFecha(linea)) {
+      const f = fechaDesdeEncabezado(linea);
+      if (f) fechaActual = f;
+      buffer = [];
+      continue;
+    }
 
-    let desc = (linea.slice(0, m.index) + linea.slice(m.index + m[0].length))
-      .replace(/[·:|_\-–]+$/, '')
-      .replace(/^[·:|_\-–]+/, '')
-      .trim();
-    if (!desc) desc = 'Movimiento';
+    const soloMonto = linea.match(RE_MONTO_SOLO);
+    if (soloMonto) {
+      const monto = parseInt(soloMonto[2].replace(/[.,]/g, ''), 10);
+      if (monto > 0) {
+        filas.push({
+          desc: buffer.length ? buffer.join(' · ') : 'Movimiento',
+          monto,
+          tipo: soloMonto[1] === '+' ? 'ingreso' : 'egreso',
+          categoria: 'otros',
+          fecha: fechaActual,
+        });
+      }
+      buffer = [];
+      continue;
+    }
 
-    filas.push({ desc, monto, tipo: m[1] === '+' ? 'ingreso' : 'egreso', categoria: 'otros', fecha: hoyStr });
+    const inline = linea.match(RE_MONTO_INLINE);
+    if (inline) {
+      const monto = parseInt(inline[2].replace(/[.,]/g, ''), 10);
+      if (monto > 0) {
+        let desc = (linea.slice(0, inline.index) + linea.slice(inline.index + inline[0].length))
+          .replace(/[·:|_\-–]+$/, '')
+          .replace(/^[·:|_\-–]+/, '')
+          .trim();
+        if (!desc) desc = buffer.length ? buffer.join(' · ') : 'Movimiento';
+        filas.push({ desc, monto, tipo: inline[1] === '+' ? 'ingreso' : 'egreso', categoria: 'otros', fecha: fechaActual });
+      }
+      buffer = [];
+      continue;
+    }
+
+    buffer.push(linea);
   }
 
   return filas;
