@@ -646,62 +646,107 @@ function fechaDesdeEncabezado(linea) {
 const RE_MONTO_SOLO   = /^([+\-])\s?[\$Ss5]?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*$/;
 const RE_MONTO_INLINE = /([+\-])\s?[\$Ss5]?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/;
 
-// Recorre el texto del OCR línea por línea. Las líneas de fecha ("Hoy",
-// "Jueves 03 de septiembre") marcan la fecha de los movimientos que siguen;
-// las líneas "Saldo: ..." se ignoran; el resto de líneas antes de un monto
-// se van juntando como descripción. Heurística simple, pensada para
-// revisar y corregir, no para acertar siempre.
+// Una línea "Saldo: $X" cierra el movimiento anterior. Exige un dígito después
+// de "saldo" (con o sin ":") para no confundirla con encabezados como "Saldo
+// disponible" / "Saldo contable" (que no van seguidos de un número).
+const RE_SALDO_LINEA = /^saldo\s*:?\s*\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/i;
+
+// Recorre el texto del OCR línea por línea y arma un bloque por movimiento:
+// descripción (líneas sueltas antes del monto), monto/tipo si se detectó un
+// signo +/- explícito, y el saldo que quedó después (de la línea "Saldo: $X").
+// Las líneas de fecha ("Hoy", "Jueves 03 de septiembre") marcan la fecha de
+// los movimientos que siguen.
+//
+// El signo +/- suele venir en letra chica y de color, así que el OCR a veces
+// no lo detecta. Por eso, en una segunda pasada, si dos movimientos seguidos
+// tienen su "saldo después" conocido, se recalcula el monto y el tipo a
+// partir de la diferencia entre esos saldos (números grandes en negro, mucho
+// más confiables para el OCR) — esto permite recuperar movimientos aunque el
+// signo se haya perdido por completo.
 function parsearMovimientosOcr(texto) {
   const lineas = String(texto).split('\n').map(l => l.trim()).filter(Boolean);
-  const filas = [];
+  const bloques = [];
+  let bloqueActual = null;
   let buffer = [];
   let fechaActual = hoyStr;
 
+  const cerrarBloque = () => {
+    if (bloqueActual) { bloques.push(bloqueActual); bloqueActual = null; }
+  };
+
   for (const linea of lineas) {
-    if (/^saldo\b/i.test(linea)) continue;
+    // Ruido de la interfaz que no aporta como descripción: encabezados de
+    // saldo sin monto ("Saldo disponible"), pestañas ("Recientes") y líneas
+    // que son solo un número/monto suelto (encabezados, o un signo +/- que
+    // el OCR perdió — ese monto igual se recupera por diferencia de saldos).
+    if (/^saldo\b/i.test(linea) && !RE_SALDO_LINEA.test(linea)) continue;
+    if (/^(recientes|rechazados)$/i.test(linea)) continue;
+    if (/^[\$Ss]?\s?\d[\d.,]*$/.test(linea)) continue;
 
     if (esEncabezadoFecha(linea)) {
+      cerrarBloque();
       const f = fechaDesdeEncabezado(linea);
       if (f) fechaActual = f;
       buffer = [];
       continue;
     }
 
-    const soloMonto = linea.match(RE_MONTO_SOLO);
-    if (soloMonto) {
-      const monto = parseInt(soloMonto[2].replace(/[.,]/g, ''), 10);
-      if (monto > 0) {
-        filas.push({
-          desc: buffer.length ? buffer.join(' · ') : 'Movimiento',
-          monto,
-          tipo: soloMonto[1] === '+' ? 'ingreso' : 'egreso',
-          categoria: 'otros',
-          fecha: fechaActual,
-        });
+    const saldoLinea = linea.match(RE_SALDO_LINEA);
+    if (saldoLinea) {
+      if (!bloqueActual) {
+        bloqueActual = { desc: buffer.join(' · ') || 'Movimiento', monto: null, tipo: null, fecha: fechaActual };
+        buffer = [];
       }
-      buffer = [];
+      bloqueActual.saldoDespues = parseInt(saldoLinea[1].replace(/[.,]/g, ''), 10);
+      cerrarBloque();
       continue;
     }
 
-    const inline = linea.match(RE_MONTO_INLINE);
-    if (inline) {
-      const monto = parseInt(inline[2].replace(/[.,]/g, ''), 10);
-      if (monto > 0) {
-        let desc = (linea.slice(0, inline.index) + linea.slice(inline.index + inline[0].length))
+    const soloMonto = linea.match(RE_MONTO_SOLO);
+    const inline = !soloMonto ? linea.match(RE_MONTO_INLINE) : null;
+
+    if (soloMonto || inline) {
+      cerrarBloque(); // si el bloque anterior no tuvo línea de saldo, se guarda tal cual
+      const m = soloMonto || inline;
+      const monto = parseInt(m[2].replace(/[.,]/g, ''), 10);
+      let desc = buffer.join(' · ');
+      if (inline) {
+        const descInline = (linea.slice(0, inline.index) + linea.slice(inline.index + inline[0].length))
           .replace(/[·:|_\-–]+$/, '')
           .replace(/^[·:|_\-–]+/, '')
           .trim();
-        if (!desc) desc = buffer.length ? buffer.join(' · ') : 'Movimiento';
-        filas.push({ desc, monto, tipo: inline[1] === '+' ? 'ingreso' : 'egreso', categoria: 'otros', fecha: fechaActual });
+        if (descInline) desc = descInline;
       }
+      bloqueActual = {
+        desc: desc || 'Movimiento',
+        monto: monto > 0 ? monto : null,
+        tipo: m[1] === '+' ? 'ingreso' : 'egreso',
+        fecha: fechaActual,
+      };
       buffer = [];
       continue;
     }
 
     buffer.push(linea);
   }
+  cerrarBloque();
 
-  return filas;
+  // Segunda pasada: recalcular monto/tipo por diferencia de saldos consecutivos.
+  for (let i = 0; i < bloques.length; i++) {
+    const actual = bloques[i];
+    const siguiente = bloques[i + 1];
+    if (actual.saldoDespues != null && siguiente && siguiente.saldoDespues != null) {
+      const delta = actual.saldoDespues - siguiente.saldoDespues;
+      if (delta !== 0) {
+        actual.monto = Math.abs(delta);
+        actual.tipo = delta > 0 ? 'ingreso' : 'egreso';
+      }
+    }
+  }
+
+  return bloques
+    .filter(b => b.monto > 0 && b.tipo)
+    .map(b => ({ desc: b.desc, monto: b.monto, tipo: b.tipo, categoria: 'otros', fecha: b.fecha }));
 }
 
 function filaOcrHtml(fila) {
