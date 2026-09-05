@@ -228,7 +228,9 @@
   .ocr-row-top input.ocr-monto { width: 92px; flex-shrink: 0; }
   .ocr-row-bottom { display: flex; gap: 6px; flex-wrap: wrap; }
   .ocr-row-bottom select,
-  .ocr-row-bottom input[type="date"] {
+  .ocr-row-bottom input[type="date"],
+  .ocr-bulk select,
+  .ocr-bulk input[type="date"] {
     flex: 1; min-width: 90px;
     padding: 6px 8px;
     border: 1px solid var(--border);
@@ -242,6 +244,19 @@
     background: none; border: none; color: var(--text3);
     font-size: 14px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
   }
+
+  .ocr-bulk {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem;
+    margin-top: 10px;
+  }
+  .ocr-bulk-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+  .ocr-bulk-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ocr-bulk-row .btn-ghost { flex: 1; padding: 6px 8px; font-size: 12px; }
 
   .ocr-acciones { display: none; gap: 8px; margin-top: 10px; }
   .ocr-acciones .btn-primary { margin-top: 0; }
@@ -458,6 +473,36 @@
         <button class="btn-ghost" style="width:100%;" onclick="document.getElementById('input-foto').click()">📷 Elegir o tomar foto</button>
         <p class="ocr-hint">Funciona mejor con listas ordenadas de movimientos (como un estado de cuenta). Vas a poder revisar y corregir todo antes de guardar.</p>
         <p class="ocr-status" id="ocr-status" style="display:none;"></p>
+
+        <div class="ocr-bulk" id="ocr-bulk">
+          <div class="ocr-bulk-label">Aplicar a las filas marcadas</div>
+          <div class="ocr-bulk-row">
+            <button type="button" class="btn-ghost" onclick="marcarTodasOcr(true)">Marcar todas</button>
+            <button type="button" class="btn-ghost" onclick="marcarTodasOcr(false)">Ninguna</button>
+          </div>
+          <div class="ocr-bulk-row">
+            <select id="ocr-bulk-tipo">
+              <option value="ingreso">Ingreso</option>
+              <option value="egreso">Egreso</option>
+            </select>
+            <select id="ocr-bulk-cat">
+              <option value="comida">🍽️ Comida</option>
+              <option value="transporte">🚌 Transporte</option>
+              <option value="vivienda">🏠 Vivienda</option>
+              <option value="ocio">🎉 Ocio</option>
+              <option value="ropa">👕 Ropa</option>
+              <option value="salud">💊 Salud</option>
+              <option value="suscripciones">🔁 Suscripciones</option>
+              <option value="otros">🎁 Otros</option>
+              <option value="reembolso" selected>🔄 Reembolso</option>
+            </select>
+          </div>
+          <div class="ocr-bulk-row">
+            <input type="date" id="ocr-bulk-fecha" placeholder="Fecha (opcional)">
+          </div>
+          <button type="button" class="btn-ghost" style="width:100%;" onclick="aplicarATodasOcr()">Aplicar a las marcadas</button>
+        </div>
+
         <div id="ocr-preview"></div>
         <div class="ocr-acciones" id="ocr-acciones">
           <button class="btn-primary" id="btn-ocr-confirmar" onclick="confirmarImportacionOcr()">Agregar movimientos</button>
@@ -510,6 +555,7 @@ const CATEGORIAS = [
   { id: 'salud',          label: 'Salud',          emoji: '💊' },
   { id: 'suscripciones',  label: 'Suscripciones',  emoji: '🔁' },
   { id: 'otros',          label: 'Otros',          emoji: '🎁' },
+  { id: 'reembolso',      label: 'Reembolso',      emoji: '🔄' },
 ];
 
 let allData      = [];
@@ -548,7 +594,9 @@ function fmtFecha(str) {
 // La categoría se guarda como una etiqueta " #id" al final de la descripción,
 // ya que la planilla no tiene una columna propia para categorías.
 function codificarDesc(desc, tipoMov, catId) {
-  return tipoMov === 'egreso' ? `${desc} #${catId}` : desc;
+  if (tipoMov === 'egreso') return `${desc} #${catId}`;
+  if (tipoMov === 'ingreso' && catId === 'reembolso') return `${desc} #reembolso`;
+  return desc;
 }
 
 function extraerCategoria(descRaw) {
@@ -689,9 +737,11 @@ async function procesarFoto(event) {
   const estado   = document.getElementById('ocr-status');
   const preview  = document.getElementById('ocr-preview');
   const acciones = document.getElementById('ocr-acciones');
+  const bulk     = document.getElementById('ocr-bulk');
 
   preview.innerHTML = '';
   acciones.style.display = 'none';
+  bulk.style.display = 'none';
   estado.style.display = 'block';
   estado.textContent = 'Leyendo imagen…';
 
@@ -706,14 +756,36 @@ async function procesarFoto(event) {
       estado.textContent = 'No detectamos montos en la imagen. Agrega el movimiento a mano abajo o intenta con otra foto.';
       filas = [{ desc: '', monto: '', tipo: 'egreso', categoria: 'otros', fecha: hoyStr }];
     } else {
-      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'}. Revisa antes de guardar:`;
+      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'}. Revisa antes de guardar (o usa "Aplicar a las marcadas" para editarlas todas de una vez):`;
     }
 
     preview.innerHTML = filas.map(filaOcrHtml).join('');
     acciones.style.display = 'flex';
+    if (filas.length > 1) bulk.style.display = 'flex';
   } catch (e) {
     estado.textContent = 'No pudimos leer la imagen. Intenta con otra foto más nítida.';
   }
+}
+
+function marcarTodasOcr(valor) {
+  document.querySelectorAll('#ocr-preview .ocr-check').forEach(cb => { cb.checked = valor; });
+}
+
+function aplicarATodasOcr() {
+  const tipoNuevo   = document.getElementById('ocr-bulk-tipo').value;
+  const catNueva    = document.getElementById('ocr-bulk-cat').value;
+  const fechaNueva  = document.getElementById('ocr-bulk-fecha').value;
+
+  let aplicadas = 0;
+  document.querySelectorAll('#ocr-preview .ocr-row').forEach(fila => {
+    if (!fila.querySelector('.ocr-check').checked) return;
+    fila.querySelector('.ocr-tipo').value = tipoNuevo;
+    fila.querySelector('.ocr-cat').value  = catNueva;
+    if (fechaNueva) fila.querySelector('.ocr-fecha').value = fechaNueva;
+    aplicadas++;
+  });
+
+  mostrarToast(aplicadas > 0 ? `Aplicado a ${aplicadas} fila${aplicadas === 1 ? '' : 's'}` : 'Marca al menos una fila primero');
 }
 
 async function confirmarImportacionOcr() {
@@ -751,6 +823,7 @@ async function confirmarImportacionOcr() {
 function cancelarImportacionOcr() {
   document.getElementById('ocr-preview').innerHTML = '';
   document.getElementById('ocr-acciones').style.display = 'none';
+  document.getElementById('ocr-bulk').style.display = 'none';
   document.getElementById('ocr-status').style.display = 'none';
 }
 
