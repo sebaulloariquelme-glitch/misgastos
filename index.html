@@ -472,6 +472,7 @@
         <input type="file" accept="image/*" id="input-foto" style="display:none" onchange="procesarFoto(event)" />
         <button class="btn-ghost" style="width:100%;" onclick="document.getElementById('input-foto').click()">📷 Elegir o tomar foto</button>
         <p class="ocr-hint">Funciona mejor con listas ordenadas de movimientos (como un estado de cuenta). Vas a poder revisar y corregir todo antes de guardar.</p>
+        <p class="ocr-hint" id="ocr-chequeo"></p>
         <p class="ocr-status" id="ocr-status" style="display:none;"></p>
 
         <div class="ocr-bulk" id="ocr-bulk">
@@ -562,9 +563,10 @@ let allData      = [];
 let tipo         = 'egreso';
 let categoria    = 'otros';
 let mesOffset    = 0; // 0 = mes actual, -1 = mes anterior, etc.
-let listaAbierta = false;
-let editandoId   = null;
-let toastTimeout = null;
+let listaAbierta   = false;
+let editandoId     = null;
+let toastTimeout   = null;
+let saldoTopeActual = null; // saldo más reciente detectado en la última foto procesada
 
 const ahora = new Date();
 
@@ -754,7 +756,7 @@ function parsearMovimientosOcr(texto) {
 
   return bloques
     .filter(b => b.monto > 0 && b.tipo)
-    .map(b => ({ desc: b.desc, monto: b.monto, tipo: b.tipo, categoria: 'otros', fecha: b.fecha }));
+    .map(b => ({ desc: b.desc, monto: b.monto, tipo: b.tipo, categoria: 'otros', fecha: b.fecha, saldoDespues: b.saldoDespues ?? null }));
 }
 
 function filaOcrHtml(fila) {
@@ -803,13 +805,32 @@ async function procesarFoto(event) {
     const { data: { text } } = await worker.recognize(file);
     await worker.terminate();
 
-    let filas = parsearMovimientosOcr(text);
+    const todas = parsearMovimientosOcr(text);
+    saldoTopeActual = todas.length ? todas[0].saldoDespues : null;
 
-    if (filas.length === 0) {
+    // Si ya hay un "punto de referencia" guardado, se corta la lista apenas
+    // aparece una fila con ese mismo saldo — todo lo que sigue (esa fila
+    // incluida) ya se registró en una importación anterior.
+    const checkpoint = getSaldoChequeo();
+    let filas = todas;
+    let omitidos = 0;
+    if (checkpoint != null) {
+      const idx = todas.findIndex(f => f.saldoDespues === checkpoint);
+      if (idx >= 0) {
+        omitidos = todas.length - idx;
+        filas = todas.slice(0, idx);
+      }
+    }
+
+    if (todas.length === 0) {
       estado.textContent = 'No detectamos montos en la imagen. Agrega el movimiento a mano abajo o intenta con otra foto.';
       filas = [{ desc: '', monto: '', tipo: 'egreso', categoria: 'otros', fecha: hoyStr }];
+      saldoTopeActual = null;
+    } else if (filas.length === 0) {
+      estado.textContent = `Ya tenías registrados todos los movimientos de esta foto (hasta ${fmt(checkpoint)}). No hay nada nuevo que agregar.`;
     } else {
-      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'}. Revisa antes de guardar (o usa "Aplicar a las marcadas" para editarlas todas de una vez):`;
+      const nota = omitidos > 0 ? ` (se omitieron ${omitidos} que ya tenías registrados)` : '';
+      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'} nuevo${filas.length === 1 ? '' : 's'}${nota}. Revisa antes de guardar:`;
     }
 
     preview.innerHTML = filas.map(filaOcrHtml).join('');
@@ -864,6 +885,10 @@ async function confirmarImportacionOcr() {
       await enviar({ action: 'add', id: Date.now() + i, tipo: tipoFila, desc: descFinal, monto, fecha: fechaFila });
       agregados++;
     }
+    // Se actualiza el punto de referencia aunque se hayan desmarcado filas:
+    // ya se revisó esta foto hasta ese saldo, así que la próxima vez no debe
+    // volver a aparecer.
+    await setSaldoChequeo(saldoTopeActual);
     await cargar();
     setSync('ok');
   } catch (e) { setSync('error'); }
@@ -874,6 +899,7 @@ async function confirmarImportacionOcr() {
 }
 
 function cancelarImportacionOcr() {
+  saldoTopeActual = null;
   document.getElementById('ocr-preview').innerHTML = '';
   document.getElementById('ocr-acciones').style.display = 'none';
   document.getElementById('ocr-bulk').style.display = 'none';
@@ -924,6 +950,26 @@ function calcMovimientosMes(mesKey) {
 function getSueldo() {
   const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
   return row ? (parseFloat(row[5]) || 0) : 0;
+}
+
+// "Saldo bancario" hasta donde ya se importaron movimientos por foto: el
+// saldo que quedó en el movimiento más reciente de la última importación.
+// Sirve para, en la próxima foto, saltarse automáticamente todo lo que ya
+// está registrado (se guarda igual que el sueldo, con una clave especial).
+function getSaldoChequeo() {
+  const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SALDO_BANCO');
+  const v = row ? parseFloat(row[5]) : NaN;
+  return isNaN(v) || v === 0 ? null : v;
+}
+
+async function setSaldoChequeo(valor) {
+  if (valor == null) return;
+  await enviar({ action: 'set_inicial', mes: 'SALDO_BANCO', value: valor });
+}
+
+async function olvidarSaldoChequeo() {
+  await post({ action: 'set_inicial', mes: 'SALDO_BANCO', value: 0 });
+  mostrarToast('Punto de referencia olvidado');
 }
 
 // Periodo de pago: del día 28 de un mes al 27 del mes siguiente.
@@ -1056,9 +1102,18 @@ async function cargar() {
   }
 }
 
+function actualizarChequeoOcr() {
+  const el = document.getElementById('ocr-chequeo');
+  const checkpoint = getSaldoChequeo();
+  el.innerHTML = checkpoint != null
+    ? `Ya tienes registrado hasta ${fmt(checkpoint)} · <a href="#" onclick="olvidarSaldoChequeo(); return false;" style="color:inherit;">olvidar</a>`
+    : '';
+}
+
 function actualizarUI() {
   const mes   = getMesActual();
   const esHoy = mesOffset === 0;
+  actualizarChequeoOcr();
 
   // Etiqueta mes
   document.getElementById('mes-label').textContent = `${MESES[mes.month]} ${mes.year}`;
