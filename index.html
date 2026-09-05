@@ -908,9 +908,35 @@ function cancelarImportacionOcr() {
 
 function setSync(state) {
   const el = document.getElementById('sync-indicator');
-  const map = { syncing:['Sincronizando…','syncing'], ok:['Sincronizado ✓','ok'], error:['Sin conexión','error'] };
+  const map = {
+    syncing: ['Sincronizando…', 'syncing'],
+    ok:      ['Sincronizado ✓', 'ok'],
+    error:   ['Sin conexión', 'error'],
+    cache:   ['Sin conexión · viendo datos guardados', 'error'],
+  };
   el.textContent = map[state][0];
   el.className = 'sync-indicator ' + map[state][1];
+}
+
+const CACHE_KEY = 'miCajaCacheV1';
+
+// Guarda una copia local de los datos para poder mostrar algo aunque no haya
+// internet. localStorage puede fallar (modo privado, cuota llena, etc.), así
+// que nunca debe romper el flujo normal de la app si falla.
+function guardarCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, guardadoEn: Date.now() }));
+  } catch (e) { /* no pasa nada si no se pudo guardar */ }
+}
+
+function leerCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.data)) return null;
+    return parsed;
+  } catch (e) { return null; }
 }
 
 function mostrarToast(msg) {
@@ -1096,9 +1122,16 @@ async function cargar() {
     actualizarUI();
     setSync('ok');
     document.getElementById('loading').style.display = 'none';
+    guardarCache(allData);
   } catch(e) {
-    setSync('error');
-    document.getElementById('loading').textContent = 'Error al conectar. Revisa tu conexión.';
+    if (allData.length > 0) {
+      // Ya había datos en pantalla (de una carga previa o del caché): se
+      // mantienen visibles, solo se avisa que no se pudo actualizar.
+      setSync('cache');
+    } else {
+      setSync('error');
+      document.getElementById('loading').textContent = 'Sin conexión y sin datos guardados. Revisa tu conexión e intenta de nuevo.';
+    }
   }
 }
 
@@ -1344,6 +1377,16 @@ function descargarResumenImagen() {
     a.click();
     URL.revokeObjectURL(url);
   });
+}
+
+// Si hay datos guardados de una carga anterior, se muestran de inmediato
+// (en vez de la pantalla de "Conectando...") mientras se intenta actualizar
+// con el servidor en segundo plano.
+const cacheInicial = leerCache();
+if (cacheInicial) {
+  allData = cacheInicial.data;
+  actualizarUI();
+  document.getElementById('loading').style.display = 'none';
 }
 
 setTipo('egreso');
