@@ -643,13 +643,15 @@ function fechaDesdeEncabezado(linea) {
 // El monto SIEMPRE debe venir precedido de un + o - explícito (así se ignoran
 // líneas como "Saldo: $654.137", que no tienen signo). El símbolo de moneda
 // es opcional y tolera que el OCR confunda "$" con "S"/"s"/"5".
-const RE_MONTO_SOLO   = /^([+\-])\s?[\$Ss5]?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*$/;
-const RE_MONTO_INLINE = /([+\-])\s?[\$Ss5]?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/;
+const RE_MONTO_SOLO   = /^([+\-])\s?(?:5?\$|[Ss5])?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*$/;
+const RE_MONTO_INLINE = /([+\-])\s?(?:5?\$|[Ss5])?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/;
 
-// Una línea "Saldo: $X" cierra el movimiento anterior. Exige un dígito después
-// de "saldo" (con o sin ":") para no confundirla con encabezados como "Saldo
-// disponible" / "Saldo contable" (que no van seguidos de un número).
-const RE_SALDO_LINEA = /^saldo\s*:?\s*\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/i;
+// Un "Saldo: $X" cierra el movimiento anterior. No está anclada al inicio de
+// línea porque el OCR a veces la pega al final del renglón anterior (ej. el
+// resto del nombre de quien transfirió: "Fernanda Gaete Labarc Saldo: $597.774").
+// Exige un dígito pegado a "saldo" (con o sin ":") para no confundirla con
+// encabezados como "Saldo disponible" / "Saldo contable".
+const RE_SALDO_LINEA = /saldo\s*:?\s*\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/i;
 
 // Recorre el texto del OCR línea por línea y arma un bloque por movimiento:
 // descripción (líneas sueltas antes del monto), monto/tipo si se detectó un
@@ -693,9 +695,15 @@ function parsearMovimientosOcr(texto) {
 
     const saldoLinea = linea.match(RE_SALDO_LINEA);
     if (saldoLinea) {
+      // Texto antes de "saldo" en la misma línea: suele ser el resto de la
+      // descripción que el OCR pegó junto (ej. la segunda mitad de un nombre).
+      const antes = linea.slice(0, saldoLinea.index).trim();
       if (!bloqueActual) {
-        bloqueActual = { desc: buffer.join(' · ') || 'Movimiento', monto: null, tipo: null, fecha: fechaActual };
+        const descPrevia = buffer.join(' · ');
+        bloqueActual = { desc: [descPrevia, antes].filter(Boolean).join(' · ') || 'Movimiento', monto: null, tipo: null, fecha: fechaActual };
         buffer = [];
+      } else if (antes) {
+        bloqueActual.desc = [bloqueActual.desc, antes].filter(Boolean).join(' · ');
       }
       bloqueActual.saldoDespues = parseInt(saldoLinea[1].replace(/[.,]/g, ''), 10);
       cerrarBloque();
