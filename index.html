@@ -208,6 +208,7 @@
   .categoria-btn.cat-ropa.active           { background: #14b8a6; }
   .categoria-btn.cat-salud.active          { background: #ef4444; }
   .categoria-btn.cat-suscripciones.active  { background: #6366f1; }
+  .categoria-btn.cat-hormiga.active        { background: #78350f; }
   .categoria-btn.cat-otros.active          { background: #64748b; }
 
   .ocr-status { font-size: 13px; color: var(--text2); text-align: center; padding: 10px 0 0; }
@@ -454,6 +455,7 @@
           <button class="categoria-btn cat-ropa" onclick="setCategoria('ropa')">👕 Ropa</button>
           <button class="categoria-btn cat-salud" onclick="setCategoria('salud')">💊 Salud</button>
           <button class="categoria-btn cat-suscripciones" onclick="setCategoria('suscripciones')">🔁 Suscripciones</button>
+          <button class="categoria-btn cat-hormiga" onclick="setCategoria('hormiga')">🐜 Gasto hormiga</button>
           <button class="categoria-btn cat-otros" onclick="setCategoria('otros')">🎁 Otros</button>
         </div>
         <input type="text" id="input-desc" placeholder="Descripción" />
@@ -494,6 +496,7 @@
               <option value="ropa">👕 Ropa</option>
               <option value="salud">💊 Salud</option>
               <option value="suscripciones">🔁 Suscripciones</option>
+              <option value="hormiga">🐜 Gasto hormiga</option>
               <option value="otros">🎁 Otros</option>
               <option value="reembolso" selected>🔄 Reembolso</option>
             </select>
@@ -555,6 +558,7 @@ const CATEGORIAS = [
   { id: 'ropa',           label: 'Ropa',           emoji: '👕' },
   { id: 'salud',          label: 'Salud',          emoji: '💊' },
   { id: 'suscripciones',  label: 'Suscripciones',  emoji: '🔁' },
+  { id: 'hormiga',        label: 'Gasto hormiga',  emoji: '🐜' },
   { id: 'otros',          label: 'Otros',          emoji: '🎁' },
   { id: 'reembolso',      label: 'Reembolso',      emoji: '🔄' },
 ];
