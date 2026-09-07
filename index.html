@@ -27,6 +27,8 @@
     --green-bg: #dcfce7;
     --red: #dc2626;
     --red-bg: #fee2e2;
+    --hormiga: #b45309;
+    --hormiga-bg: #fef3c7;
     --accent: #2563eb;
     --radius: 14px;
     --radius-sm: 8px;
@@ -45,6 +47,8 @@
       --green-bg: #14532d44;
       --red: #f87171;
       --red-bg: #7f1d1d44;
+      --hormiga: #fbbf24;
+      --hormiga-bg: #78350f44;
       --accent: #60a5fa;
     }
   }
@@ -332,15 +336,30 @@
     border-bottom: 1px solid var(--border);
   }
   .movimiento:last-child { border-bottom: none; }
+  .movimiento.hormiga { background: var(--hormiga-bg); }
   .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .mov-dot.ingreso { background: var(--green); }
   .mov-dot.egreso  { background: var(--red); }
+  .mov-dot.hormiga { background: var(--hormiga); }
   .mov-info { flex: 1; min-width: 0; }
   .mov-desc  { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mov-fecha { font-size: 11px; color: var(--text3); margin-top: 2px; }
   .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
   .mov-amount.ingreso { color: var(--green); }
   .mov-amount.egreso  { color: var(--red); }
+  .mov-amount.hormiga { color: var(--hormiga); }
+
+  .hormiga-banner {
+    background: var(--hormiga-bg);
+    color: var(--hormiga);
+    border: 1px solid var(--hormiga);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 1rem;
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: 0.75rem;
+  }
+  .hormiga-banner strong { font-weight: 700; }
   .mov-del {
     background: none; border: none; color: var(--text3);
     font-size: 16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
@@ -436,6 +455,10 @@
       <div class="metric-label">egresos</div>
       <div class="metric-value red" id="lbl-egresos">$0</div>
     </div>
+  </div>
+
+  <div class="hormiga-banner" id="hormiga-banner" style="display:none;">
+    🐜 Vas <strong id="hormiga-total">$0</strong> en gastos hormiga este mes
   </div>
 
   <!-- Solo visible en mes actual -->
@@ -977,6 +1000,16 @@ function calcMovimientosMes(mesKey) {
   return { ingresos, egresos, neto: egresos - ingresos };
 }
 
+function calcGastoHormigaMes(mesKey) {
+  let total = 0;
+  for (const row of allData) {
+    if (row[0] === 'INICIAL') continue;
+    if (!String(row[4]).startsWith(mesKey)) continue;
+    if (extraerCategoria(row[2]).catId === 'hormiga') total += parseFloat(row[3]) || 0;
+  }
+  return total;
+}
+
 function getSueldo() {
   const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
   return row ? (parseFloat(row[5]) || 0) : 0;
@@ -1167,6 +1200,16 @@ function actualizarUI() {
   document.getElementById('lbl-ingresos').textContent = fmt(ingresos);
   document.getElementById('lbl-egresos').textContent  = fmt(egresos);
 
+  // Gasto hormiga del mes: se destaca aparte para notar cuánto suman
+  const gastoHormiga = calcGastoHormigaMes(mes.key);
+  const bannerHormiga = document.getElementById('hormiga-banner');
+  if (gastoHormiga > 0) {
+    document.getElementById('hormiga-total').textContent = fmt(gastoHormiga);
+    bannerHormiga.style.display = 'block';
+  } else {
+    bannerHormiga.style.display = 'none';
+  }
+
   // Monto disponible por día (siempre referido a hoy, independiente del mes que se navega)
   actualizarDisponible();
 
@@ -1195,14 +1238,15 @@ function actualizarUI() {
       const { desc, catId } = extraerCategoria(m[2]);
       const cat = CATEGORIAS.find(c => c.id === catId);
       const etiqueta = cat ? `${cat.emoji} ${cat.label}` : (m[1] === 'ingreso' ? 'Ingreso' : 'Egreso');
+      const esHormiga = catId === 'hormiga';
       return `
-      <div class="movimiento">
-        <div class="mov-dot ${m[1]}"></div>
+      <div class="movimiento${esHormiga ? ' hormiga' : ''}">
+        <div class="mov-dot ${m[1]}${esHormiga ? ' hormiga' : ''}"></div>
         <div class="mov-info${esHoy ? ' editable' : ''}"${esHoy ? ` onclick="iniciarEdicion('${m[0]}')"` : ''}>
           <div class="mov-desc">${desc}</div>
           <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${etiqueta}</div>
         </div>
-        <div class="mov-amount ${m[1]}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
+        <div class="mov-amount ${m[1]}${esHormiga ? ' hormiga' : ''}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
         ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
       </div>
     `;
