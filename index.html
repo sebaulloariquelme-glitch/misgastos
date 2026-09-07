@@ -1010,6 +1010,37 @@ function calcGastoHormigaMes(mesKey) {
   return total;
 }
 
+// Mismos colores que usan los chips de categoría en la app, para que la
+// imagen descargada se vea consistente con lo que se ve en pantalla.
+const COLOR_CATEGORIA = {
+  comida: '#f59e0b',
+  transporte: '#0ea5e9',
+  vivienda: '#8b5cf6',
+  ocio: '#ec4899',
+  ropa: '#14b8a6',
+  salud: '#ef4444',
+  suscripciones: '#6366f1',
+  hormiga: '#78350f',
+  otros: '#64748b',
+};
+
+// Egresos del mes agrupados por categoría (los sin categoría —de antes de
+// que existieran— se agrupan en "Otros"), ordenados de mayor a menor.
+function calcDesgloseCategoriasMes(mesKey) {
+  const totales = {};
+  for (const row of allData) {
+    if (row[0] === 'INICIAL' || row[1] !== 'egreso') continue;
+    if (!String(row[4]).startsWith(mesKey)) continue;
+    const { catId } = extraerCategoria(row[2]);
+    const id = catId && COLOR_CATEGORIA[catId] ? catId : 'otros';
+    totales[id] = (totales[id] || 0) + (parseFloat(row[3]) || 0);
+  }
+  return Object.entries(totales)
+    .map(([id, monto]) => ({ ...CATEGORIAS.find(c => c.id === id), monto }))
+    .filter(d => d.monto > 0)
+    .sort((a, b) => b.monto - a.monto);
+}
+
 function getSueldo() {
   const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
   return row ? (parseFloat(row[5]) || 0) : 0;
@@ -1353,7 +1384,14 @@ function descargarResumenImagen() {
   const { inicioStr, finStr } = getPeriodoPago();
   const saldoFinal = sueldo - calcNetoPeriodo(inicioStr, finStr);
 
-  const W = 800, H = 572, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
+  const desglose = calcDesgloseCategoriasMes(mes.key);
+  const PIE_R = 65;
+  const LEGEND_ROW_H = 30;
+  const seccionTortaH = desglose.length > 0
+    ? 44 + Math.max(PIE_R * 2, desglose.length * LEGEND_ROW_H) + 16
+    : 0;
+
+  const W = 800, H = 572 + seccionTortaH, pad = 40, cardX = pad, cardY = pad, cardW = W - pad * 2, cardH = H - pad * 2;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -1412,6 +1450,53 @@ function descargarResumenImagen() {
 
     y += 38;
   });
+
+  if (desglose.length > 0) {
+    y += 12;
+    ctx.font = '600 14px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#666';
+    ctx.fillText('Gastos por categoría', left, y);
+    y += 30;
+
+    const totalDesglose = desglose.reduce((s, d) => s + d.monto, 0);
+    const pieCx = left + PIE_R;
+    const pieCy = y + Math.max(PIE_R, (desglose.length * LEGEND_ROW_H) / 2);
+
+    let anguloActual = -Math.PI / 2;
+    desglose.forEach(d => {
+      const angulo = (d.monto / totalDesglose) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(pieCx, pieCy);
+      ctx.arc(pieCx, pieCy, PIE_R, anguloActual, anguloActual + angulo);
+      ctx.closePath();
+      ctx.fillStyle = COLOR_CATEGORIA[d.id] || '#64748b';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      anguloActual += angulo;
+    });
+
+    const legendX = pieCx + PIE_R + 40;
+    let ly = pieCy - (desglose.length * LEGEND_ROW_H) / 2 + 14;
+    desglose.forEach(d => {
+      const pct = Math.round((d.monto / totalDesglose) * 100);
+      ctx.fillStyle = COLOR_CATEGORIA[d.id] || '#64748b';
+      ctx.beginPath();
+      ctx.arc(legendX, ly - 5, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '600 13px -apple-system, "Segoe UI", sans-serif';
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(`${d.emoji} ${d.label}`, legendX + 16, ly);
+
+      ctx.font = '400 12px -apple-system, "Segoe UI", sans-serif';
+      ctx.fillStyle = '#666';
+      ctx.fillText(`${fmt(d.monto)} · ${pct}%`, legendX + 16, ly + 15);
+
+      ly += LEGEND_ROW_H;
+    });
+  }
 
   ctx.font = '400 12px -apple-system, "Segoe UI", sans-serif';
   ctx.fillStyle = '#999';
