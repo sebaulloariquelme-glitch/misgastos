@@ -439,10 +439,10 @@
       <div class="disponible-progress-label" id="disponible-progress-label"></div>
       <div class="disponible-progress"><div class="disponible-progress-bar" id="disponible-progress-bar"></div></div>
     </div>
-    <button class="disponible-edit-link" onclick="toggleSueldoForm()">Editar sueldo mensual</button>
+    <button class="disponible-edit-link" onclick="toggleSueldoForm()">Editar saldo actual</button>
     <div class="sueldo-form" id="sueldo-form">
-      <input type="number" id="input-sueldo" placeholder="Sueldo mensual" min="0" />
-      <button class="btn-primary" onclick="setSueldo()">Guardar</button>
+      <input type="number" id="input-sueldo" placeholder="Saldo actual" min="0" />
+      <button class="btn-primary" onclick="setSaldoActual()">Guardar</button>
     </div>
   </div>
 
@@ -594,6 +594,7 @@ let listaAbierta   = false;
 let editandoId     = null;
 let toastTimeout   = null;
 let saldoTopeActual = null; // saldo más reciente detectado en la última foto procesada
+let saldoTopeFecha  = null; // fecha de ese movimiento más reciente
 
 const ahora = new Date();
 
@@ -834,11 +835,13 @@ async function procesarFoto(event) {
 
     const todas = parsearMovimientosOcr(text);
     saldoTopeActual = todas.length ? todas[0].saldoDespues : null;
+    saldoTopeFecha  = todas.length ? todas[0].fecha : null;
 
     // Si ya hay un "punto de referencia" guardado, se corta la lista apenas
     // aparece una fila con ese mismo saldo — todo lo que sigue (esa fila
     // incluida) ya se registró en una importación anterior.
-    const checkpoint = getSaldoChequeo();
+    const baseActual = getSaldoBase();
+    const checkpoint = baseActual ? baseActual.valor : null;
     let filas = todas;
     let omitidos = 0;
     if (checkpoint != null) {
@@ -853,6 +856,7 @@ async function procesarFoto(event) {
       estado.textContent = 'No detectamos montos en la imagen. Agrega el movimiento a mano abajo o intenta con otra foto.';
       filas = [{ desc: '', monto: '', tipo: 'egreso', categoria: 'otros', fecha: hoyStr }];
       saldoTopeActual = null;
+      saldoTopeFecha  = null;
     } else if (filas.length === 0) {
       estado.textContent = `Ya tenías registrados todos los movimientos de esta foto (hasta ${fmt(checkpoint)}). No hay nada nuevo que agregar.`;
     } else {
@@ -914,8 +918,10 @@ async function confirmarImportacionOcr() {
     }
     // Se actualiza el punto de referencia aunque se hayan desmarcado filas:
     // ya se revisó esta foto hasta ese saldo, así que la próxima vez no debe
-    // volver a aparecer.
-    await setSaldoChequeo(saldoTopeActual);
+    // volver a aparecer. Este mismo saldo es el que alimenta el disponible.
+    if (saldoTopeActual != null && saldoTopeFecha) {
+      await setSaldoBase(saldoTopeActual, saldoTopeFecha);
+    }
     await cargar();
     setSync('ok');
   } catch (e) { setSync('error'); }
@@ -927,6 +933,7 @@ async function confirmarImportacionOcr() {
 
 function cancelarImportacionOcr() {
   saldoTopeActual = null;
+  saldoTopeFecha  = null;
   document.getElementById('ocr-preview').innerHTML = '';
   document.getElementById('ocr-acciones').style.display = 'none';
   document.getElementById('ocr-bulk').style.display = 'none';
@@ -1041,29 +1048,53 @@ function calcDesgloseCategoriasMes(mesKey) {
     .sort((a, b) => b.monto - a.monto);
 }
 
-function getSueldo() {
-  const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
-  return row ? (parseFloat(row[5]) || 0) : 0;
+// Un solo saldo real (como una cuenta corriente): un valor "base" conocido
+// en una fecha, más todo lo que entró/salió desde entonces. Ese mismo saldo
+// es el que se usa como punto de referencia al importar fotos (se guarda con
+// las mismas claves especiales SALDO_BASE / SALDO_BASE_FECHA).
+function getSaldoBase() {
+  const rowBase = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SALDO_BASE');
+  const valorBase = rowBase ? parseFloat(rowBase[5]) : NaN;
+  if (!isNaN(valorBase) && valorBase !== 0) {
+    const rowFecha = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SALDO_BASE_FECHA');
+    const fechaNum = rowFecha ? parseInt(rowFecha[5], 10) : NaN;
+    const fecha = !isNaN(fechaNum)
+      ? `${String(fechaNum).slice(0,4)}-${String(fechaNum).slice(4,6)}-${String(fechaNum).slice(6,8)}`
+      : hoyStr;
+    return { valor: valorBase, fecha };
+  }
+  // Migración desde el "sueldo mensual" que usaba la app antes de unificar
+  // ambos saldos: se toma como punto de partida, válido desde hoy.
+  const rowSueldo = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
+  const sueldoViejo = rowSueldo ? parseFloat(rowSueldo[5]) : NaN;
+  if (!isNaN(sueldoViejo) && sueldoViejo !== 0) return { valor: sueldoViejo, fecha: hoyStr };
+  return null;
 }
 
-// "Saldo bancario" hasta donde ya se importaron movimientos por foto: el
-// saldo que quedó en el movimiento más reciente de la última importación.
-// Sirve para, en la próxima foto, saltarse automáticamente todo lo que ya
-// está registrado (se guarda igual que el sueldo, con una clave especial).
-function getSaldoChequeo() {
-  const row = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SALDO_BANCO');
-  const v = row ? parseFloat(row[5]) : NaN;
-  return isNaN(v) || v === 0 ? null : v;
-}
-
-async function setSaldoChequeo(valor) {
-  if (valor == null) return;
-  await enviar({ action: 'set_inicial', mes: 'SALDO_BANCO', value: valor });
+async function setSaldoBase(valor, fechaStr) {
+  const fechaNum = parseInt(String(fechaStr).replace(/-/g, ''), 10);
+  await enviar({ action: 'set_inicial', mes: 'SALDO_BASE', value: valor });
+  await enviar({ action: 'set_inicial', mes: 'SALDO_BASE_FECHA', value: fechaNum });
 }
 
 async function olvidarSaldoChequeo() {
-  await post({ action: 'set_inicial', mes: 'SALDO_BANCO', value: 0 });
+  await post({ action: 'set_inicial', mes: 'SALDO_BASE', value: 0 });
   mostrarToast('Punto de referencia olvidado');
+}
+
+// Saldo actual = saldo base + todo lo que entró/salió después de esa fecha.
+// Lo anterior a esa fecha ya está incluido en el propio saldo base.
+function calcSaldoActual() {
+  const base = getSaldoBase();
+  if (!base) return null;
+  let cambio = 0;
+  for (const row of allData) {
+    if (row[0] === 'INICIAL') continue;
+    if (String(row[4]) <= base.fecha) continue;
+    const monto = parseFloat(row[3]) || 0;
+    cambio += row[1] === 'ingreso' ? monto : -monto;
+  }
+  return base.valor + cambio;
 }
 
 // Periodo de pago: del día 28 de un mes al 27 del mes siguiente.
@@ -1094,16 +1125,14 @@ function calcNetoPeriodo(inicioStr, finStr) {
 }
 
 function actualizarDisponible() {
-  const sueldo = getSueldo();
+  const saldoActual = calcSaldoActual();
   const { inicio, fin, inicioStr, finStr } = getPeriodoPago();
-  const gastado   = calcNetoPeriodo(inicioStr, finStr);
-  const restante  = sueldo - gastado;
 
   const inicioMed = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
   const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
   const finMed = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
   const diasRestantes = Math.max(1, Math.round((finMed - hoyMed) / 86400000) + 1);
-  const porDia = restante / diasRestantes;
+  const porDia = saldoActual != null ? saldoActual / diasRestantes : null;
 
   const el       = document.getElementById('disponible-amount');
   const subEl    = document.getElementById('disponible-sub');
@@ -1112,28 +1141,34 @@ function actualizarDisponible() {
   const progBar  = document.getElementById('disponible-progress-bar');
   const progLbl  = document.getElementById('disponible-progress-label');
 
-  if (sueldo <= 0) {
+  if (saldoActual == null) {
     el.textContent = '—';
     tarjeta.classList.remove('negativo');
-    subEl.textContent = 'Configura tu sueldo mensual para calcularlo';
+    subEl.textContent = 'Configura tu saldo actual para calcularlo';
     progWrap.style.display = 'none';
   } else {
     el.textContent = fmt(porDia);
     tarjeta.classList.toggle('negativo', porDia < 0);
-    subEl.textContent = `${fmt(restante)} disponibles · ${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
+    subEl.textContent = `${fmt(saldoActual)} disponibles · ${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
 
+    // Se reconstruye el saldo que había al empezar el período (saldo actual
+    // + lo gastado neto desde entonces) para mostrar cuánto de eso ya se usó.
+    const gastadoPeriodo = calcNetoPeriodo(inicioStr, finStr);
+    const saldoInicioPeriodo = saldoActual + gastadoPeriodo;
     const diasTotales = Math.round((finMed - inicioMed) / 86400000) + 1;
     const diaActual   = diasTotales - diasRestantes + 1;
-    const pctGastado  = Math.min(100, Math.max(0, Math.round((gastado / sueldo) * 100)));
+    const pctGastado  = saldoInicioPeriodo > 0
+      ? Math.min(100, Math.max(0, Math.round((gastadoPeriodo / saldoInicioPeriodo) * 100)))
+      : 0;
 
     progWrap.style.display = 'block';
     progBar.style.width = pctGastado + '%';
-    progLbl.textContent = `Día ${diaActual} de ${diasTotales} del período · ${pctGastado}% del sueldo gastado`;
+    progLbl.textContent = `Día ${diaActual} de ${diasTotales} del período · ${pctGastado}% gastado`;
   }
 
-  const inputSueldo = document.getElementById('input-sueldo');
-  if (document.activeElement !== inputSueldo) {
-    inputSueldo.value = sueldo > 0 ? sueldo : '';
+  const inputSaldo = document.getElementById('input-sueldo');
+  if (document.activeElement !== inputSaldo) {
+    inputSaldo.value = saldoActual != null ? Math.round(saldoActual) : '';
   }
 }
 
@@ -1141,12 +1176,17 @@ function toggleSueldoForm() {
   document.getElementById('sueldo-form').classList.toggle('visible');
 }
 
-async function setSueldo() {
+async function setSaldoActual() {
   const v = parseFloat(document.getElementById('input-sueldo').value);
   if (isNaN(v) || v < 0) return;
-  await post({ action: 'set_inicial', mes: 'SUELDO', value: v });
+  setSync('syncing');
+  try {
+    await setSaldoBase(v, hoyStr);
+    await cargar();
+    setSync('ok');
+  } catch (e) { setSync('error'); }
   document.getElementById('sueldo-form').classList.remove('visible');
-  mostrarToast('Sueldo actualizado ✓');
+  mostrarToast('Saldo actualizado ✓');
 }
 
 function toggleLista() {
@@ -1205,9 +1245,9 @@ async function cargar() {
 
 function actualizarChequeoOcr() {
   const el = document.getElementById('ocr-chequeo');
-  const checkpoint = getSaldoChequeo();
-  el.innerHTML = checkpoint != null
-    ? `Ya tienes registrado hasta ${fmt(checkpoint)} · <a href="#" onclick="olvidarSaldoChequeo(); return false;" style="color:inherit;">olvidar</a>`
+  const base = getSaldoBase();
+  el.innerHTML = base != null
+    ? `Ya tienes registrado hasta ${fmt(base.valor)} · <a href="#" onclick="olvidarSaldoChequeo(); return false;" style="color:inherit;">olvidar</a>`
     : '';
 }
 
@@ -1380,9 +1420,7 @@ function descargarResumenImagen() {
 
   if (cantidad === 0) { alert('No hay movimientos para resumir este mes.'); return; }
 
-  const sueldo = getSueldo();
-  const { inicioStr, finStr } = getPeriodoPago();
-  const saldoFinal = sueldo - calcNetoPeriodo(inicioStr, finStr);
+  const saldoActual = calcSaldoActual();
 
   const desglose = calcDesgloseCategoriasMes(mes.key);
   const PIE_R = 65;
@@ -1419,16 +1457,15 @@ function descargarResumenImagen() {
 
   y += 80;
   ctx.font = '700 48px -apple-system, "Segoe UI", sans-serif';
-  ctx.fillStyle = sueldo > 0 && saldoFinal < 0 ? '#dc2626' : '#16a34a';
-  ctx.fillText(sueldo > 0 ? fmt(saldoFinal) : '—', left, y);
+  ctx.fillStyle = saldoActual != null && saldoActual < 0 ? '#dc2626' : '#16a34a';
+  ctx.fillText(saldoActual != null ? fmt(saldoActual) : '—', left, y);
 
   y += 24;
   ctx.font = '400 13px -apple-system, "Segoe UI", sans-serif';
   ctx.fillStyle = '#999';
-  ctx.fillText('saldo final del período de pago', left, y);
+  ctx.fillText('tu saldo actual', left, y);
 
   const filas = [
-    ['Saldo disponible', sueldo > 0 ? fmt(sueldo) : '—', '#2563eb'],
     ['Ingresos', fmt(ingresos), '#16a34a'],
     ['Egresos', fmt(egresos), '#dc2626'],
     ['Movimientos', String(cantidad), '#1a1a1a'],
@@ -1529,7 +1566,7 @@ setInterval(cargar, 30000);
 
 document.getElementById('input-desc').addEventListener('keydown',  e => { if (e.key==='Enter') document.getElementById('input-monto').focus(); });
 document.getElementById('input-monto').addEventListener('keydown', e => { if (e.key==='Enter') agregar(); });
-document.getElementById('input-sueldo').addEventListener('keydown', e => { if (e.key==='Enter') setSueldo(); });
+document.getElementById('input-sueldo').addEventListener('keydown', e => { if (e.key==='Enter') setSaldoActual(); });
 </script>
 </body>
 </html>
