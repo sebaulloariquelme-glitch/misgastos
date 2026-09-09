@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.5" />
+<meta name="app-version" content="2026-09-09.6" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -145,6 +145,7 @@
   .disponible-label { font-size: 11px; color: rgba(255,255,255,0.75); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
   .disponible-amount { font-size: 34px; font-weight: 700; letter-spacing: -1px; color: #fff; }
   .disponible-sub { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 8px; }
+  .disponible-pordia { font-size: 15px; font-weight: 600; color: #fff; margin-top: 6px; }
 
   .disponible-progress-wrap { margin-top: 12px; }
   .disponible-progress-label { font-size: 11px; color: rgba(255,255,255,0.85); margin-bottom: 6px; }
@@ -436,6 +437,7 @@
     <div class="disponible-label">Disponible</div>
     <div class="disponible-amount" id="disponible-amount">$0</div>
     <div class="disponible-sub" id="disponible-sub"></div>
+    <div class="disponible-pordia" id="disponible-pordia"></div>
     <div class="disponible-progress-wrap" id="disponible-progress-wrap" style="display:none;">
       <div class="disponible-progress-label" id="disponible-progress-label"></div>
       <div class="disponible-progress"><div class="disponible-progress-bar" id="disponible-progress-bar"></div></div>
@@ -574,7 +576,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.5';
+const APP_VERSION = '2026-09-09.6';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1186,6 +1188,7 @@ function actualizarDisponible() {
 
   const el       = document.getElementById('disponible-amount');
   const subEl    = document.getElementById('disponible-sub');
+  const pordiaEl = document.getElementById('disponible-pordia');
   const tarjeta  = document.getElementById('disponible-card');
   const progWrap = document.getElementById('disponible-progress-wrap');
   const progBar  = document.getElementById('disponible-progress-bar');
@@ -1195,11 +1198,18 @@ function actualizarDisponible() {
     el.textContent = '—';
     tarjeta.classList.remove('negativo');
     subEl.textContent = 'Configura tu saldo actual para calcularlo';
+    pordiaEl.textContent = '';
     progWrap.style.display = 'none';
   } else {
     el.textContent = fmt(saldoActual);
     tarjeta.classList.toggle('negativo', saldoActual < 0);
     subEl.textContent = `${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
+
+    // Se divide por los días TOTALES del período (no por los restantes):
+    // así este monto solo cambia cuando cambia el saldo actual (un
+    // ingreso o egreso real), nunca solo por el paso de los días.
+    const porDia = saldoActual / diasTotales;
+    pordiaEl.textContent = `${fmt(porDia)} por día hasta el ${fin.getDate()}`;
 
     // Se reconstruye el saldo que había al empezar el período (saldo actual
     // + lo gastado neto desde entonces) para mostrar cuánto de eso ya se usó.
