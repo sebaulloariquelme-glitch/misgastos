@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
+<meta name="app-version" content="2026-09-09.1" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -567,6 +568,24 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
 <script>
+// Como app instalada (ícono en el celular) sin service worker, el celular
+// puede quedarse mostrando una copia vieja guardada en caché sin darse
+// cuenta de que hay una versión nueva publicada. Por eso se revisa contra
+// el propio archivo en el servidor (sin caché, con un query único para
+// evitar que cualquier caché intermedia lo intercepte) y si la versión no
+// coincide, se recarga sola.
+const APP_VERSION = '2026-09-09.1';
+async function revisarVersionNueva() {
+  try {
+    const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
+    const html = await res.text();
+    const m = html.match(/<meta name="app-version" content="([^"]+)"/);
+    if (m && m[1] !== APP_VERSION) location.reload();
+  } catch (e) { /* sin conexión: se reintenta en el próximo chequeo */ }
+}
+revisarVersionNueva();
+setInterval(revisarVersionNueva, 60000);
+
 const API = 'https://script.google.com/macros/s/AKfycbxzLSTmN53pMhOr56GIzAeJjhxn_U7e8JOjmebUfk7NrtluBg-O2EFRBhVqcD2B-exE/exec';
 const PAYDAY = 28;
 
