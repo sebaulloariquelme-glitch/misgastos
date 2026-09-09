@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.3" />
+<meta name="app-version" content="2026-09-09.4" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -574,7 +574,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.3';
+const APP_VERSION = '2026-09-09.4';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1089,9 +1089,13 @@ function ultimoInicial(clave) {
 }
 
 function getSaldoBase() {
+  // Una vez que existe una fila SALDO_BASE, manda sin importar su valor
+  // (incluso si es 0): no se usa "valor !== 0" para decidir si está
+  // "configurado", porque eso hacía que un 0 guardado por error resucitara
+  // un SUELDO viejo y olvidado en vez de mostrar el saldo real.
   const rowBase = ultimoInicial('SALDO_BASE');
   const valorBase = rowBase ? parseFloat(rowBase[5]) : NaN;
-  if (!isNaN(valorBase) && valorBase !== 0) {
+  if (rowBase && !isNaN(valorBase)) {
     const rowFecha = ultimoInicial('SALDO_BASE_FECHA');
     const fechaNum = rowFecha ? parseInt(rowFecha[5], 10) : NaN;
     const fecha = !isNaN(fechaNum)
@@ -1100,10 +1104,10 @@ function getSaldoBase() {
     return { valor: valorBase, fecha };
   }
   // Migración desde el "sueldo mensual" que usaba la app antes de unificar
-  // ambos saldos: se toma como punto de partida, válido desde hoy.
+  // ambos saldos: solo aplica mientras nunca se haya guardado un saldo.
   const rowSueldo = ultimoInicial('SUELDO');
   const sueldoViejo = rowSueldo ? parseFloat(rowSueldo[5]) : NaN;
-  if (!isNaN(sueldoViejo) && sueldoViejo !== 0) return { valor: sueldoViejo, fecha: hoyStr };
+  if (!isNaN(sueldoViejo)) return { valor: sueldoViejo, fecha: hoyStr };
   return null;
 }
 
@@ -1111,11 +1115,6 @@ async function setSaldoBase(valor, fechaStr) {
   const fechaNum = parseInt(String(fechaStr).replace(/-/g, ''), 10);
   await enviar({ action: 'set_inicial', mes: 'SALDO_BASE', value: valor });
   await enviar({ action: 'set_inicial', mes: 'SALDO_BASE_FECHA', value: fechaNum });
-}
-
-async function olvidarSaldoChequeo() {
-  await post({ action: 'set_inicial', mes: 'SALDO_BASE', value: 0 });
-  mostrarToast('Punto de referencia olvidado');
 }
 
 // Las fechas que devuelve la hoja a veces vienen como fecha-hora completa
@@ -1312,7 +1311,7 @@ function actualizarChequeoOcr() {
   const el = document.getElementById('ocr-chequeo');
   const base = getSaldoBase();
   el.innerHTML = base != null
-    ? `Ya tienes registrado hasta ${fmt(base.valor)} · <a href="#" onclick="olvidarSaldoChequeo(); return false;" style="color:inherit;">olvidar</a>`
+    ? `Ya tienes registrado hasta ${fmt(base.valor)}`
     : '';
 }
 
