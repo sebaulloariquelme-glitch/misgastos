@@ -1202,22 +1202,28 @@ function toggleSueldoForm() {
 async function setSaldoActual() {
   const v = parseFloat(document.getElementById('input-sueldo').value);
   if (isNaN(v) || v < 0) return;
+
+  // La pantalla se actualiza de inmediato con lo que el usuario escribió,
+  // ANTES de intentar guardar en el servidor: así el monto mostrado
+  // siempre es exactamente el que se ingresó, pase lo que pase con la
+  // sincronización (si el guardado falla o tarda, no se pierde el cambio
+  // visualmente; el refresco automático de cada 30s reconcilia después).
+  const fechaNum = parseInt(hoyStr.replace(/-/g, ''), 10);
+  allData.push(['INICIAL', '', '', '', 'SALDO_BASE', v]);
+  allData.push(['INICIAL', '', '', '', 'SALDO_BASE_FECHA', fechaNum]);
+  actualizarUI();
+  guardarCache(allData);
+  document.getElementById('sueldo-form').classList.remove('visible');
+
   setSync('syncing');
   try {
     await setSaldoBase(v, hoyStr);
-    // Se actualiza el estado local de inmediato con lo que el usuario
-    // escribió, en vez de esperar un cargar() que puede tardar en reflejar
-    // la escritura recién hecha (el backend tarda en propagarla). El
-    // refresco automático de cada 30s ya se encarga de sincronizar después.
-    const fechaNum = parseInt(hoyStr.replace(/-/g, ''), 10);
-    allData.push(['INICIAL', '', '', '', 'SALDO_BASE', v]);
-    allData.push(['INICIAL', '', '', '', 'SALDO_BASE_FECHA', fechaNum]);
-    actualizarUI();
-    guardarCache(allData);
     setSync('ok');
-  } catch (e) { setSync('error'); }
-  document.getElementById('sueldo-form').classList.remove('visible');
-  mostrarToast('Saldo actualizado ✓');
+    mostrarToast('Saldo actualizado ✓');
+  } catch (e) {
+    setSync('error');
+    mostrarToast('Saldo actualizado, pero no se pudo guardar en el servidor');
+  }
 }
 
 function toggleLista() {
