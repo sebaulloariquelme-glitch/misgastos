@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.6" />
+<meta name="app-version" content="2026-09-09.7" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -576,7 +576,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.6';
+const APP_VERSION = '2026-09-09.7';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1205,10 +1205,11 @@ function actualizarDisponible() {
     tarjeta.classList.toggle('negativo', saldoActual < 0);
     subEl.textContent = `${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
 
-    // Se divide por los días TOTALES del período (no por los restantes):
-    // así este monto solo cambia cuando cambia el saldo actual (un
-    // ingreso o egreso real), nunca solo por el paso de los días.
-    const porDia = saldoActual / diasTotales;
+    // Se divide por los días que QUEDAN hasta el 27: mañana, con un día
+    // menos por delante, este monto sube solo aunque no haya movimientos
+    // nuevos — y además se recalcula de inmediato si cambia el saldo (un
+    // ingreso o egreso).
+    const porDia = saldoActual / diasRestantes;
     pordiaEl.textContent = `${fmt(porDia)} por día hasta el ${fin.getDate()}`;
 
     // Se reconstruye el saldo que había al empezar el período (saldo actual
