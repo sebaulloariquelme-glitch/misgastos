@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.4" />
+<meta name="app-version" content="2026-09-09.5" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -574,7 +574,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.4';
+const APP_VERSION = '2026-09-09.5';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -944,7 +944,7 @@ async function confirmarImportacionOcr() {
     // ya se revisó esta foto hasta ese saldo, así que la próxima vez no debe
     // volver a aparecer. Este mismo saldo es el que alimenta el disponible.
     if (saldoTopeActual != null && saldoTopeFecha) {
-      await setSaldoBase(saldoTopeActual, saldoTopeFecha);
+      await setSaldoBase(saldoTopeActual);
     }
     await cargar();
     setSync('ok');
@@ -1073,9 +1073,9 @@ function calcDesgloseCategoriasMes(mesKey) {
 }
 
 // Un solo saldo real (como una cuenta corriente): un valor "base" conocido
-// en una fecha, más todo lo que entró/salió desde entonces. Ese mismo saldo
-// es el que se usa como punto de referencia al importar fotos (se guarda con
-// las mismas claves especiales SALDO_BASE / SALDO_BASE_FECHA).
+// en un momento dado, más todo lo que entró/salió desde entonces. Ese
+// mismo saldo es el que se usa como punto de referencia al importar fotos
+// (se guarda con las mismas claves especiales SALDO_BASE / SALDO_BASE_MOMENTO).
 // Busca la fila INICIAL de una clave dada, quedándose con la ÚLTIMA
 // coincidencia en vez de la primera: el backend va agregando filas en vez
 // de sobrescribir la anterior, así que si hay más de una para la misma
@@ -1096,25 +1096,27 @@ function getSaldoBase() {
   const rowBase = ultimoInicial('SALDO_BASE');
   const valorBase = rowBase ? parseFloat(rowBase[5]) : NaN;
   if (rowBase && !isNaN(valorBase)) {
-    const rowFecha = ultimoInicial('SALDO_BASE_FECHA');
-    const fechaNum = rowFecha ? parseInt(rowFecha[5], 10) : NaN;
-    const fecha = !isNaN(fechaNum)
-      ? `${String(fechaNum).slice(0,4)}-${String(fechaNum).slice(4,6)}-${String(fechaNum).slice(6,8)}`
-      : hoyStr;
-    return { valor: valorBase, fecha };
+    // "momento" es la hora exacta (no solo el día) en que se guardó este
+    // saldo: así un movimiento agregado el MISMO día, pero un instante
+    // después de guardar, sí se suma o resta — antes, al comparar por día
+    // completo, cualquier movimiento de "hoy" quedaba excluido, calzara o
+    // no calzara con lo que ya estaba reflejado en el saldo guardado.
+    const rowMomento = ultimoInicial('SALDO_BASE_MOMENTO');
+    const momento = rowMomento ? parseFloat(rowMomento[5]) : NaN;
+    return { valor: valorBase, momento: isNaN(momento) ? 0 : momento };
   }
   // Migración desde el "sueldo mensual" que usaba la app antes de unificar
   // ambos saldos: solo aplica mientras nunca se haya guardado un saldo.
+  // Todo lo agregado desde este instante en adelante se suma o resta.
   const rowSueldo = ultimoInicial('SUELDO');
   const sueldoViejo = rowSueldo ? parseFloat(rowSueldo[5]) : NaN;
-  if (!isNaN(sueldoViejo)) return { valor: sueldoViejo, fecha: hoyStr };
+  if (!isNaN(sueldoViejo)) return { valor: sueldoViejo, momento: Date.now() };
   return null;
 }
 
-async function setSaldoBase(valor, fechaStr) {
-  const fechaNum = parseInt(String(fechaStr).replace(/-/g, ''), 10);
+async function setSaldoBase(valor) {
   await enviar({ action: 'set_inicial', mes: 'SALDO_BASE', value: valor });
-  await enviar({ action: 'set_inicial', mes: 'SALDO_BASE_FECHA', value: fechaNum });
+  await enviar({ action: 'set_inicial', mes: 'SALDO_BASE_MOMENTO', value: Date.now() });
 }
 
 // Las fechas que devuelve la hoja a veces vienen como fecha-hora completa
@@ -1124,15 +1126,18 @@ async function setSaldoBase(valor, fechaStr) {
 // exacta de texto.
 function soloFecha(valor) { return String(valor).slice(0, 10); }
 
-// Saldo actual = saldo base + todo lo que entró/salió después de esa fecha.
-// Lo anterior a esa fecha ya está incluido en el propio saldo base.
+// Saldo actual = saldo base + todo lo que se agregó DESPUÉS de guardar esa
+// base (comparando por id, que es la hora exacta de creación de cada
+// movimiento, no por su fecha). Lo anterior a ese momento ya está
+// incluido en el propio saldo base.
 function calcSaldoActual() {
   const base = getSaldoBase();
   if (!base) return null;
   let cambio = 0;
   for (const row of allData) {
     if (esInicial(row)) continue;
-    if (soloFecha(row[4]) <= base.fecha) continue;
+    const id = Number(row[0]);
+    if (!isNaN(id) && id <= base.momento) continue;
     const monto = parseFloat(row[3]) || 0;
     cambio += row[1] === 'ingreso' ? monto : -monto;
   }
@@ -1234,7 +1239,7 @@ async function setSaldoActual() {
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   setSync('syncing');
   try {
-    await setSaldoBase(v, hoyStr);
+    await setSaldoBase(v);
     let confirmado = false;
     for (let intento = 0; intento < 5 && !confirmado; intento++) {
       await cargar();
