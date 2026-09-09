@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.1" />
+<meta name="app-version" content="2026-09-09.2" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -574,7 +574,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.1';
+const APP_VERSION = '2026-09-09.2';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -604,6 +604,11 @@ const CATEGORIAS = [
   { id: 'otros',          label: 'Otros',          emoji: '🎁' },
   { id: 'reembolso',      label: 'Reembolso',      emoji: '🔄' },
 ];
+
+// Las filas especiales (saldo base, etc.) deben detectarse aunque la hoja
+// les agregue espacios o mayúsculas distintas al guardar/leer — si no, se
+// cuentan por error como movimientos reales y arruinan todas las sumas.
+function esInicial(row) { return String(row[0]).trim().toUpperCase() === 'INICIAL'; }
 
 let allData      = [];
 let tipo         = 'egreso';
@@ -1017,7 +1022,7 @@ function setCategoria(catId) {
 function calcMovimientosMes(mesKey) {
   let ingresos = 0, egresos = 0;
   for (const row of allData) {
-    if (row[0] === 'INICIAL') continue;
+    if (esInicial(row)) continue;
     if (String(row[4]).startsWith(mesKey)) {
       if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
       else egresos += parseFloat(row[3]) || 0;
@@ -1029,7 +1034,7 @@ function calcMovimientosMes(mesKey) {
 function calcGastoHormigaMes(mesKey) {
   let total = 0;
   for (const row of allData) {
-    if (row[0] === 'INICIAL') continue;
+    if (esInicial(row)) continue;
     if (!String(row[4]).startsWith(mesKey)) continue;
     if (extraerCategoria(row[2]).catId === 'hormiga') total += parseFloat(row[3]) || 0;
   }
@@ -1055,7 +1060,7 @@ const COLOR_CATEGORIA = {
 function calcDesgloseCategoriasMes(mesKey) {
   const totales = {};
   for (const row of allData) {
-    if (row[0] === 'INICIAL' || row[1] !== 'egreso') continue;
+    if (esInicial(row) || row[1] !== 'egreso') continue;
     if (!String(row[4]).startsWith(mesKey)) continue;
     const { catId } = extraerCategoria(row[2]);
     const id = catId && COLOR_CATEGORIA[catId] ? catId : 'otros';
@@ -1078,7 +1083,7 @@ function calcDesgloseCategoriasMes(mesKey) {
 function ultimoInicial(clave) {
   let ultima = null;
   for (const row of allData) {
-    if (row[0] === 'INICIAL' && String(row[4]).trim() === clave) ultima = row;
+    if (esInicial(row) && String(row[4]).trim() === clave) ultima = row;
   }
   return ultima;
 }
@@ -1127,7 +1132,7 @@ function calcSaldoActual() {
   if (!base) return null;
   let cambio = 0;
   for (const row of allData) {
-    if (row[0] === 'INICIAL') continue;
+    if (esInicial(row)) continue;
     if (soloFecha(row[4]) <= base.fecha) continue;
     const monto = parseFloat(row[3]) || 0;
     cambio += row[1] === 'ingreso' ? monto : -monto;
@@ -1152,7 +1157,7 @@ function getPeriodoPago() {
 function calcNetoPeriodo(inicioStr, finStr) {
   let ingresos = 0, egresos = 0;
   for (const row of allData) {
-    if (row[0] === 'INICIAL') continue;
+    if (esInicial(row)) continue;
     const f = soloFecha(row[4]);
     if (f >= inicioStr && f <= finStr) {
       if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
@@ -1222,27 +1227,33 @@ async function setSaldoActual() {
   const v = parseFloat(document.getElementById('input-sueldo').value);
   if (isNaN(v) || v < 0) return;
 
-  // La pantalla se actualiza de inmediato con lo que el usuario escribió,
-  // ANTES de intentar guardar en el servidor: así el monto mostrado
-  // siempre es exactamente el que se ingresó, pase lo que pase con la
-  // sincronización (si el guardado falla o tarda, no se pierde el cambio
-  // visualmente; el refresco automático de cada 30s reconcilia después).
-  const fechaNum = parseInt(hoyStr.replace(/-/g, ''), 10);
-  allData.push(['INICIAL', '', '', '', 'SALDO_BASE', v]);
-  allData.push(['INICIAL', '', '', '', 'SALDO_BASE_FECHA', fechaNum]);
-  actualizarUI();
-  guardarCache(allData);
-  document.getElementById('sueldo-form').classList.remove('visible');
-
+  // Todo se maneja con la hoja de cálculo como única fuente de verdad, sin
+  // estado local "optimista": se guarda, y luego se vuelve a leer de
+  // verdad desde el servidor (así todos los dispositivos terminan viendo
+  // lo mismo). Como el backend puede demorar un momento en reflejar lo que
+  // se acaba de escribir, se reintenta la lectura unas pocas veces antes
+  // de avisar que la sincronización está tardando.
+  const btn = document.querySelector('#sueldo-form .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   setSync('syncing');
   try {
     await setSaldoBase(v, hoyStr);
-    setSync('ok');
-    mostrarToast('Saldo actualizado ✓');
+    let confirmado = false;
+    for (let intento = 0; intento < 5 && !confirmado; intento++) {
+      await cargar();
+      confirmado = Math.round(calcSaldoActual()) === Math.round(v);
+      if (!confirmado) await new Promise(r => setTimeout(r, 1000));
+    }
+    setSync(confirmado ? 'ok' : 'error');
+    mostrarToast(confirmado
+      ? 'Saldo actualizado ✓'
+      : 'El servidor está tardando en reflejar el cambio; se va a sincronizar solo en un momento');
   } catch (e) {
     setSync('error');
-    mostrarToast('Saldo actualizado, pero no se pudo guardar en el servidor');
+    mostrarToast('No se pudo guardar el saldo');
   }
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  document.getElementById('sueldo-form').classList.remove('visible');
 }
 
 function toggleLista() {
@@ -1341,7 +1352,7 @@ function actualizarUI() {
   actualizarDisponible();
 
   // Lista de movimientos del mes: más reciente primero (por fecha y, si empatan, por orden de registro)
-  const movs = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key))
+  const movs = allData.filter(r => !esInicial(r) && String(r[4]).startsWith(mes.key))
     .sort((a,b) => {
       const porFecha = String(b[4]).localeCompare(String(a[4]));
       if (porFecha !== 0) return porFecha;
@@ -1472,7 +1483,7 @@ function trazarRectRedondeado(ctx, x, y, w, h, r) {
 function descargarResumenImagen() {
   const mes  = getMesActual();
   const { ingresos, egresos } = calcMovimientosMes(mes.key);
-  const cantidad = allData.filter(r => r[0] !== 'INICIAL' && String(r[4]).startsWith(mes.key)).length;
+  const cantidad = allData.filter(r => !esInicial(r) && String(r[4]).startsWith(mes.key)).length;
 
   if (cantidad === 0) { alert('No hay movimientos para resumir este mes.'); return; }
 
