@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.2" />
+<meta name="app-version" content="2026-09-09.3" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -433,7 +433,7 @@
 <div class="main">
 
   <div class="disponible-card" id="disponible-card">
-    <div class="disponible-label">Monto disponible por día</div>
+    <div class="disponible-label">Disponible</div>
     <div class="disponible-amount" id="disponible-amount">$0</div>
     <div class="disponible-sub" id="disponible-sub"></div>
     <div class="disponible-progress-wrap" id="disponible-progress-wrap" style="display:none;">
@@ -574,7 +574,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.2';
+const APP_VERSION = '2026-09-09.3';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1168,6 +1168,9 @@ function calcNetoPeriodo(inicioStr, finStr) {
 }
 
 function actualizarDisponible() {
+  // "Disponible" es directamente el saldo actual, sin dividir por los días
+  // que quedan: lo que ves acá es exactamente lo que pusiste en "saldo
+  // actual", ni un peso distinto.
   const saldoActual = calcSaldoActual();
   const { inicio, fin, inicioStr, finStr } = getPeriodoPago();
 
@@ -1175,12 +1178,7 @@ function actualizarDisponible() {
   const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
   const finMed = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
   const diasRestantes = Math.max(1, Math.round((finMed - hoyMed) / 86400000) + 1);
-  // Se divide por los días TOTALES del período (no por los restantes) para
-  // que el monto por día quede fijo: solo cambia si cambia el saldo actual
-  // (un ingreso/egreso) o si se entra a un período de pago nuevo, nunca
-  // solo por el paso de los días.
   const diasTotales = Math.round((finMed - inicioMed) / 86400000) + 1;
-  const porDia = saldoActual != null ? saldoActual / diasTotales : null;
 
   const el       = document.getElementById('disponible-amount');
   const subEl    = document.getElementById('disponible-sub');
@@ -1195,9 +1193,9 @@ function actualizarDisponible() {
     subEl.textContent = 'Configura tu saldo actual para calcularlo';
     progWrap.style.display = 'none';
   } else {
-    el.textContent = fmt(porDia);
-    tarjeta.classList.toggle('negativo', porDia < 0);
-    subEl.textContent = `${fmt(saldoActual)} disponibles · ${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
+    el.textContent = fmt(saldoActual);
+    tarjeta.classList.toggle('negativo', saldoActual < 0);
+    subEl.textContent = `${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
 
     // Se reconstruye el saldo que había al empezar el período (saldo actual
     // + lo gastado neto desde entonces) para mostrar cuánto de eso ya se usó.
