@@ -1052,11 +1052,23 @@ function calcDesgloseCategoriasMes(mesKey) {
 // en una fecha, más todo lo que entró/salió desde entonces. Ese mismo saldo
 // es el que se usa como punto de referencia al importar fotos (se guarda con
 // las mismas claves especiales SALDO_BASE / SALDO_BASE_FECHA).
+// Busca la fila INICIAL de una clave dada, quedándose con la ÚLTIMA
+// coincidencia en vez de la primera: el backend va agregando filas en vez
+// de sobrescribir la anterior, así que si hay más de una para la misma
+// clave, la más reciente (al final) es la que vale.
+function ultimoInicial(clave) {
+  let ultima = null;
+  for (const row of allData) {
+    if (row[0] === 'INICIAL' && String(row[4]).trim() === clave) ultima = row;
+  }
+  return ultima;
+}
+
 function getSaldoBase() {
-  const rowBase = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SALDO_BASE');
+  const rowBase = ultimoInicial('SALDO_BASE');
   const valorBase = rowBase ? parseFloat(rowBase[5]) : NaN;
   if (!isNaN(valorBase) && valorBase !== 0) {
-    const rowFecha = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SALDO_BASE_FECHA');
+    const rowFecha = ultimoInicial('SALDO_BASE_FECHA');
     const fechaNum = rowFecha ? parseInt(rowFecha[5], 10) : NaN;
     const fecha = !isNaN(fechaNum)
       ? `${String(fechaNum).slice(0,4)}-${String(fechaNum).slice(4,6)}-${String(fechaNum).slice(6,8)}`
@@ -1065,7 +1077,7 @@ function getSaldoBase() {
   }
   // Migración desde el "sueldo mensual" que usaba la app antes de unificar
   // ambos saldos: se toma como punto de partida, válido desde hoy.
-  const rowSueldo = allData.find(r => r[0] === 'INICIAL' && String(r[4]).trim() === 'SUELDO');
+  const rowSueldo = ultimoInicial('SUELDO');
   const sueldoViejo = rowSueldo ? parseFloat(rowSueldo[5]) : NaN;
   if (!isNaN(sueldoViejo) && sueldoViejo !== 0) return { valor: sueldoViejo, fecha: hoyStr };
   return null;
@@ -1182,7 +1194,15 @@ async function setSaldoActual() {
   setSync('syncing');
   try {
     await setSaldoBase(v, hoyStr);
-    await cargar();
+    // Se actualiza el estado local de inmediato con lo que el usuario
+    // escribió, en vez de esperar un cargar() que puede tardar en reflejar
+    // la escritura recién hecha (el backend tarda en propagarla). El
+    // refresco automático de cada 30s ya se encarga de sincronizar después.
+    const fechaNum = parseInt(hoyStr.replace(/-/g, ''), 10);
+    allData.push(['INICIAL', '', '', '', 'SALDO_BASE', v]);
+    allData.push(['INICIAL', '', '', '', 'SALDO_BASE_FECHA', fechaNum]);
+    actualizarUI();
+    guardarCache(allData);
     setSync('ok');
   } catch (e) { setSync('error'); }
   document.getElementById('sueldo-form').classList.remove('visible');
