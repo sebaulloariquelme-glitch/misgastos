@@ -1094,6 +1094,13 @@ async function olvidarSaldoChequeo() {
   mostrarToast('Punto de referencia olvidado');
 }
 
+// Las fechas que devuelve la hoja a veces vienen como fecha-hora completa
+// (ej: "2026-09-09T04:00:00.000Z") en vez de solo "2026-09-09", porque
+// Sheets las guarda como celdas de fecha. Por eso en todo el archivo se
+// compara con startsWith/los primeros 10 caracteres en vez de igualdad
+// exacta de texto.
+function soloFecha(valor) { return String(valor).slice(0, 10); }
+
 // Saldo actual = saldo base + todo lo que entró/salió después de esa fecha.
 // Lo anterior a esa fecha ya está incluido en el propio saldo base.
 function calcSaldoActual() {
@@ -1102,7 +1109,7 @@ function calcSaldoActual() {
   let cambio = 0;
   for (const row of allData) {
     if (row[0] === 'INICIAL') continue;
-    if (String(row[4]) <= base.fecha) continue;
+    if (soloFecha(row[4]) <= base.fecha) continue;
     const monto = parseFloat(row[3]) || 0;
     cambio += row[1] === 'ingreso' ? monto : -monto;
   }
@@ -1127,7 +1134,7 @@ function calcNetoPeriodo(inicioStr, finStr) {
   let ingresos = 0, egresos = 0;
   for (const row of allData) {
     if (row[0] === 'INICIAL') continue;
-    const f = String(row[4]);
+    const f = soloFecha(row[4]);
     if (f >= inicioStr && f <= finStr) {
       if (row[1] === 'ingreso') ingresos += parseFloat(row[3]) || 0;
       else egresos += parseFloat(row[3]) || 0;
@@ -1144,7 +1151,12 @@ function actualizarDisponible() {
   const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
   const finMed = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
   const diasRestantes = Math.max(1, Math.round((finMed - hoyMed) / 86400000) + 1);
-  const porDia = saldoActual != null ? saldoActual / diasRestantes : null;
+  // Se divide por los días TOTALES del período (no por los restantes) para
+  // que el monto por día quede fijo: solo cambia si cambia el saldo actual
+  // (un ingreso/egreso) o si se entra a un período de pago nuevo, nunca
+  // solo por el paso de los días.
+  const diasTotales = Math.round((finMed - inicioMed) / 86400000) + 1;
+  const porDia = saldoActual != null ? saldoActual / diasTotales : null;
 
   const el       = document.getElementById('disponible-amount');
   const subEl    = document.getElementById('disponible-sub');
@@ -1167,7 +1179,6 @@ function actualizarDisponible() {
     // + lo gastado neto desde entonces) para mostrar cuánto de eso ya se usó.
     const gastadoPeriodo = calcNetoPeriodo(inicioStr, finStr);
     const saldoInicioPeriodo = saldoActual + gastadoPeriodo;
-    const diasTotales = Math.round((finMed - inicioMed) / 86400000) + 1;
     const diaActual   = diasTotales - diasRestantes + 1;
     const pctGastado  = saldoInicioPeriodo > 0
       ? Math.min(100, Math.max(0, Math.round((gastadoPeriodo / saldoInicioPeriodo) * 100)))
