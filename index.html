@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-09.7" />
+<meta name="app-version" content="2026-09-17.1" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -500,7 +500,6 @@
         <input type="file" accept="image/*" id="input-foto" style="display:none" onchange="procesarFoto(event)" />
         <button class="btn-ghost" style="width:100%;" onclick="document.getElementById('input-foto').click()">📷 Elegir o tomar foto</button>
         <p class="ocr-hint">Funciona mejor con listas ordenadas de movimientos (como un estado de cuenta). Vas a poder revisar y corregir todo antes de guardar.</p>
-        <p class="ocr-hint" id="ocr-chequeo"></p>
         <p class="ocr-status" id="ocr-status" style="display:none;"></p>
 
         <div class="ocr-bulk" id="ocr-bulk">
@@ -576,7 +575,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-09.7';
+const APP_VERSION = '2026-09-17.1';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -863,31 +862,18 @@ async function procesarFoto(event) {
     saldoTopeActual = todas.length ? todas[0].saldoDespues : null;
     saldoTopeFecha  = todas.length ? todas[0].fecha : null;
 
-    // Si ya hay un "punto de referencia" guardado, se corta la lista apenas
-    // aparece una fila con ese mismo saldo — todo lo que sigue (esa fila
-    // incluida) ya se registró en una importación anterior.
-    const baseActual = getSaldoBase();
-    const checkpoint = baseActual ? baseActual.valor : null;
+    // Se muestran SIEMPRE todas las filas detectadas — el usuario revisa y
+    // desmarca a mano las que ya tenía registradas, en vez de que la app
+    // adivine cuáles omitir comparando saldos.
     let filas = todas;
-    let omitidos = 0;
-    if (checkpoint != null) {
-      const idx = todas.findIndex(f => f.saldoDespues === checkpoint);
-      if (idx >= 0) {
-        omitidos = todas.length - idx;
-        filas = todas.slice(0, idx);
-      }
-    }
 
     if (todas.length === 0) {
       estado.textContent = 'No detectamos montos en la imagen. Agrega el movimiento a mano abajo o intenta con otra foto.';
       filas = [{ desc: '', monto: '', tipo: 'egreso', categoria: 'otros', fecha: hoyStr }];
       saldoTopeActual = null;
       saldoTopeFecha  = null;
-    } else if (filas.length === 0) {
-      estado.textContent = `Ya tenías registrados todos los movimientos de esta foto (hasta ${fmt(checkpoint)}). No hay nada nuevo que agregar.`;
     } else {
-      const nota = omitidos > 0 ? ` (se omitieron ${omitidos} que ya tenías registrados)` : '';
-      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'} nuevo${filas.length === 1 ? '' : 's'}${nota}. Revisa antes de guardar:`;
+      estado.textContent = `Encontramos ${filas.length} movimiento${filas.length === 1 ? '' : 's'}. Desmarca los que ya tengas registrados y revisa antes de guardar:`;
     }
 
     preview.innerHTML = filas.map(filaOcrHtml).join('');
@@ -1323,18 +1309,9 @@ async function cargar() {
   }
 }
 
-function actualizarChequeoOcr() {
-  const el = document.getElementById('ocr-chequeo');
-  const base = getSaldoBase();
-  el.innerHTML = base != null
-    ? `Ya tienes registrado hasta ${fmt(base.valor)}`
-    : '';
-}
-
 function actualizarUI() {
   const mes   = getMesActual();
   const esHoy = mesOffset === 0;
-  actualizarChequeoOcr();
 
   // Etiqueta mes
   document.getElementById('mes-label').textContent = `${MESES[mes.month]} ${mes.year}`;
