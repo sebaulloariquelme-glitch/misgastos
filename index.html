@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-17.1" />
+<meta name="app-version" content="2026-09-17.2" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -216,6 +216,8 @@
   .categoria-btn.cat-suscripciones.active  { background: #6366f1; }
   .categoria-btn.cat-hormiga.active        { background: #78350f; }
   .categoria-btn.cat-otros.active          { background: #64748b; }
+  .categoria-btn.cat-reembolso.active      { background: #2563eb; }
+  .categoria-btn.cat-reajuste.active       { background: #84cc16; }
 
   .ocr-status { font-size: 13px; color: var(--text2); text-align: center; padding: 10px 0 0; }
   .ocr-hint   { font-size: 11px; color: var(--text3); margin-top: 6px; text-align: center; }
@@ -473,17 +475,7 @@
           <button class="tipo-btn" id="btn-ingreso" onclick="setTipo('ingreso')">+ Ingreso</button>
           <button class="tipo-btn active-egreso" id="btn-egreso" onclick="setTipo('egreso')">− Egreso</button>
         </div>
-        <div class="categoria-toggle" id="categoria-toggle">
-          <button class="categoria-btn cat-comida" onclick="setCategoria('comida')">🍽️ Comida</button>
-          <button class="categoria-btn cat-transporte" onclick="setCategoria('transporte')">🚌 Transporte</button>
-          <button class="categoria-btn cat-vivienda" onclick="setCategoria('vivienda')">🏠 Vivienda</button>
-          <button class="categoria-btn cat-ocio" onclick="setCategoria('ocio')">🎉 Ocio</button>
-          <button class="categoria-btn cat-ropa" onclick="setCategoria('ropa')">👕 Ropa</button>
-          <button class="categoria-btn cat-salud" onclick="setCategoria('salud')">💊 Salud</button>
-          <button class="categoria-btn cat-suscripciones" onclick="setCategoria('suscripciones')">🔁 Suscripciones</button>
-          <button class="categoria-btn cat-hormiga" onclick="setCategoria('hormiga')">🐜 Gasto hormiga</button>
-          <button class="categoria-btn cat-otros" onclick="setCategoria('otros')">🎁 Otros</button>
-        </div>
+        <div class="categoria-toggle" id="categoria-toggle"></div>
         <input type="text" id="input-desc" placeholder="Descripción" />
         <div class="row">
           <input type="number" id="input-monto" placeholder="Monto" min="0" />
@@ -524,6 +516,7 @@
               <option value="hormiga">🐜 Gasto hormiga</option>
               <option value="otros">🎁 Otros</option>
               <option value="reembolso" selected>🔄 Reembolso</option>
+              <option value="reajuste">⚖️ Reajuste</option>
             </select>
           </div>
           <div class="ocr-bulk-row">
@@ -575,7 +568,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-17.1';
+const APP_VERSION = '2026-09-17.2';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -594,16 +587,20 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 const DIAS  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 const CATEGORIAS = [
-  { id: 'comida',         label: 'Comida',         emoji: '🍽️' },
-  { id: 'transporte',     label: 'Transporte',     emoji: '🚌' },
-  { id: 'vivienda',       label: 'Vivienda',       emoji: '🏠' },
-  { id: 'ocio',           label: 'Ocio',           emoji: '🎉' },
-  { id: 'ropa',           label: 'Ropa',           emoji: '👕' },
-  { id: 'salud',          label: 'Salud',          emoji: '💊' },
-  { id: 'suscripciones',  label: 'Suscripciones',  emoji: '🔁' },
-  { id: 'hormiga',        label: 'Gasto hormiga',  emoji: '🐜' },
-  { id: 'otros',          label: 'Otros',          emoji: '🎁' },
-  { id: 'reembolso',      label: 'Reembolso',      emoji: '🔄' },
+  { id: 'comida',         label: 'Comida',         emoji: '🍽️', tipos: ['egreso'] },
+  { id: 'transporte',     label: 'Transporte',     emoji: '🚌', tipos: ['egreso'] },
+  { id: 'vivienda',       label: 'Vivienda',       emoji: '🏠', tipos: ['egreso'] },
+  { id: 'ocio',           label: 'Ocio',           emoji: '🎉', tipos: ['egreso'] },
+  { id: 'ropa',           label: 'Ropa',           emoji: '👕', tipos: ['egreso'] },
+  { id: 'salud',          label: 'Salud',          emoji: '💊', tipos: ['egreso'] },
+  { id: 'suscripciones',  label: 'Suscripciones',  emoji: '🔁', tipos: ['egreso'] },
+  { id: 'hormiga',        label: 'Gasto hormiga',  emoji: '🐜', tipos: ['egreso'] },
+  { id: 'otros',          label: 'Otros',          emoji: '🎁', tipos: ['egreso'] },
+  { id: 'reembolso',      label: 'Reembolso',      emoji: '🔄', tipos: ['ingreso'] },
+  // Para cuadrar la caja cuando faltaron movimientos por registrar: puede
+  // ir tanto como ingreso (si sobra plata real respecto de lo anotado)
+  // como egreso (si falta), a diferencia del resto de las categorías.
+  { id: 'reajuste',       label: 'Reajuste',       emoji: '⚖️', tipos: ['ingreso', 'egreso'] },
 ];
 
 // Las filas especiales (saldo base, etc.) deben detectarse aunque la hoja
@@ -647,10 +644,12 @@ function fmtFecha(str) {
 }
 
 // La categoría se guarda como una etiqueta " #id" al final de la descripción,
-// ya que la planilla no tiene una columna propia para categorías.
+// ya que la planilla no tiene una columna propia para categorías. Solo se
+// etiqueta si esa categoría aplica para el tipo de movimiento (ej.
+// "Reembolso" no tiene sentido en un egreso).
 function codificarDesc(desc, tipoMov, catId) {
-  if (tipoMov === 'egreso') return `${desc} #${catId}`;
-  if (tipoMov === 'ingreso' && catId === 'reembolso') return `${desc} #reembolso`;
+  const cat = CATEGORIAS.find(c => c.id === catId);
+  if (cat && cat.tipos.includes(tipoMov)) return `${desc} #${catId}`;
   return desc;
 }
 
@@ -997,13 +996,28 @@ function setTipo(t) {
   tipo = t;
   document.getElementById('btn-ingreso').className = 'tipo-btn' + (t==='ingreso'?' active-ingreso':'');
   document.getElementById('btn-egreso').className  = 'tipo-btn' + (t==='egreso' ?' active-egreso':'');
-  document.getElementById('categoria-toggle').style.display = t === 'egreso' ? 'flex' : 'none';
+  renderCategoriaToggle(t);
+}
+
+// Las categorías que se muestran dependen del tipo de movimiento (ej.
+// "Reembolso" solo tiene sentido en un ingreso). Se regeneran los botones
+// cada vez que cambia el tipo, y si la categoría elegida hasta ahora ya no
+// aplica, se resetea a un valor por defecto válido para el nuevo tipo.
+function renderCategoriaToggle(t) {
+  const cats = CATEGORIAS.filter(c => c.tipos.includes(t));
+  const cont = document.getElementById('categoria-toggle');
+  cont.innerHTML = cats.map(c =>
+    `<button class="categoria-btn cat-${c.id}" onclick="setCategoria('${c.id}')">${c.emoji} ${c.label}</button>`
+  ).join('');
+  cont.style.display = cats.length ? 'flex' : 'none';
+  const catValida = cats.some(c => c.id === categoria);
+  setCategoria(catValida ? categoria : (t === 'egreso' ? 'otros' : null));
 }
 
 function setCategoria(catId) {
   categoria = catId;
   document.querySelectorAll('#categoria-toggle .categoria-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.classList.contains('cat-' + catId));
+    btn.classList.toggle('active', catId != null && btn.classList.contains('cat-' + catId));
   });
 }
 
@@ -1041,6 +1055,7 @@ const COLOR_CATEGORIA = {
   suscripciones: '#6366f1',
   hormiga: '#78350f',
   otros: '#64748b',
+  reajuste: '#84cc16',
 };
 
 // Egresos del mes agrupados por categoría (los sin categoría —de antes de
