@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-17.2" />
+<meta name="app-version" content="2026-09-17.3" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -364,6 +364,18 @@
     margin-bottom: 0.75rem;
   }
   .hormiga-banner strong { font-weight: 700; }
+
+  .gap-banner {
+    background: var(--hormiga-bg);
+    color: var(--hormiga);
+    border: 1px solid var(--hormiga);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 1rem;
+    font-size: 13px;
+    text-align: center;
+    margin: 0.75rem 0;
+  }
+  .gap-banner strong { font-weight: 700; }
   .mov-del {
     background: none; border: none; color: var(--text3);
     font-size: 16px; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
@@ -450,6 +462,8 @@
       <button class="btn-primary" onclick="setSaldoActual()">Guardar</button>
     </div>
   </div>
+
+  <div class="gap-banner" id="gap-banner" style="display:none;"></div>
 
   <div class="metrics">
     <div class="metric">
@@ -568,7 +582,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-17.2';
+const APP_VERSION = '2026-09-17.3';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1174,6 +1188,28 @@ function calcNetoPeriodo(inicioStr, finStr) {
   return egresos - ingresos;
 }
 
+// Avisa si hace días que no se registra ningún movimiento, para poder
+// comparar contra los movimientos reales del banco y no perder el hilo
+// (es lo que después obliga a usar "Reajuste" para cuadrar la caja).
+function actualizarGapBanner() {
+  const el = document.getElementById('gap-banner');
+  let ultimaFecha = null;
+  for (const row of allData) {
+    if (esInicial(row)) continue;
+    const f = soloFecha(row[4]);
+    if (!ultimaFecha || f > ultimaFecha) ultimaFecha = f;
+  }
+  if (!ultimaFecha || ultimaFecha === hoyStr) {
+    el.style.display = 'none';
+    return;
+  }
+  const [y, m, d] = ultimaFecha.split('-').map(Number);
+  const hoyMed = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const dias = Math.round((hoyMed - new Date(y, m - 1, d)) / 86400000);
+  el.innerHTML = `📋 No has registrado nada desde el <strong>${fmtFecha(ultimaFecha)}</strong> (hace ${dias} día${dias === 1 ? '' : 's'}) — revisa tus movimientos del banco.`;
+  el.style.display = 'block';
+}
+
 function actualizarDisponible() {
   // "Disponible" es directamente el saldo actual, sin dividir por los días
   // que quedan: lo que ves acá es exactamente lo que pusiste en "saldo
@@ -1355,6 +1391,7 @@ function actualizarUI() {
 
   // Monto disponible por día (siempre referido a hoy, independiente del mes que se navega)
   actualizarDisponible();
+  actualizarGapBanner();
 
   // Lista de movimientos del mes: más reciente primero (por fecha y, si empatan, por orden de registro)
   const movs = allData.filter(r => !esInicial(r) && String(r[4]).startsWith(mes.key))
