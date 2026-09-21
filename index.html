@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-17.3" />
+<meta name="app-version" content="2026-09-21.1" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -582,7 +582,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-17.3';
+const APP_VERSION = '2026-09-21.1';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -624,7 +624,7 @@ function esInicial(row) { return String(row[0]).trim().toUpperCase() === 'INICIA
 
 let allData      = [];
 let tipo         = 'egreso';
-let categoria    = 'otros';
+let categoria    = null; // sin categoría elegida hasta que el usuario toque una
 let mesOffset    = 0; // 0 = mes actual, -1 = mes anterior, etc.
 let listaAbierta   = false;
 let editandoId     = null;
@@ -1024,8 +1024,10 @@ function renderCategoriaToggle(t) {
     `<button class="categoria-btn cat-${c.id}" onclick="setCategoria('${c.id}')">${c.emoji} ${c.label}</button>`
   ).join('');
   cont.style.display = cats.length ? 'flex' : 'none';
+  // No se preselecciona ninguna: en egreso hay que elegirla a mano antes
+  // de poder guardar (ver agregar()).
   const catValida = cats.some(c => c.id === categoria);
-  setCategoria(catValida ? categoria : (t === 'egreso' ? 'otros' : null));
+  setCategoria(catValida ? categoria : null);
 }
 
 function setCategoria(catId) {
@@ -1440,14 +1442,27 @@ async function agregar() {
   const monto = parseFloat(document.getElementById('input-monto').value);
   const err   = document.getElementById('error');
 
-  if (!desc || isNaN(monto) || monto <= 0) { err.style.display = 'block'; return; }
+  // La categoría es obligatoria en un egreso (para que el desglose y el
+  // total de gastos hormiga sirvan de algo); la descripción, en cambio,
+  // es opcional — si se deja vacía, se usa el nombre de la categoría.
+  if (tipo === 'egreso' && !categoria) {
+    err.textContent = 'Elige una categoría.';
+    err.style.display = 'block';
+    return;
+  }
+  if (isNaN(monto) || monto <= 0) {
+    err.textContent = 'Completa el monto.';
+    err.style.display = 'block';
+    return;
+  }
   err.style.display = 'none';
 
   const btn = document.getElementById('btn-agregar');
   btn.disabled = true; btn.textContent = 'Guardando...';
 
   const esEdicion = !!editandoId;
-  const descFinal = codificarDesc(desc, tipo, categoria);
+  const catLabel = CATEGORIAS.find(c => c.id === categoria)?.label;
+  const descFinal = codificarDesc(desc || catLabel || (tipo === 'ingreso' ? 'Ingreso' : 'Egreso'), tipo, categoria);
 
   if (esEdicion) {
     const original = allData.find(r => String(r[0]) === String(editandoId));
@@ -1498,7 +1513,6 @@ function cancelarEdicion() {
   document.getElementById('btn-agregar').textContent = 'Agregar';
   document.getElementById('btn-cancelar-edicion').style.display = 'none';
   setTipo('egreso');
-  setCategoria('otros');
 }
 
 async function eliminar(id) {
@@ -1669,7 +1683,6 @@ if (cacheInicial) {
 }
 
 setTipo('egreso');
-setCategoria('otros');
 cargar();
 setInterval(cargar, 30000);
 
