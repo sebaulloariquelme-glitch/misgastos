@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
-<meta name="theme-color" content="#2563eb" />
-<meta name="app-version" content="2026-09-21.1" />
+<meta name="theme-color" content="#0a0a12" />
+<meta name="app-version" content="2026-09-21.2" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -17,41 +17,23 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #f5f5f0;
-    --surface: #ffffff;
-    --surface2: #f9f9f7;
-    --border: rgba(0,0,0,0.1);
-    --text: #1a1a1a;
-    --text2: #666;
-    --text3: #999;
-    --green: #16a34a;
-    --green-bg: #dcfce7;
-    --red: #dc2626;
-    --red-bg: #fee2e2;
-    --hormiga: #b45309;
-    --hormiga-bg: #fef3c7;
-    --accent: #2563eb;
-    --radius: 14px;
-    --radius-sm: 8px;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #111110;
-      --surface: #1c1c1a;
-      --surface2: #242422;
-      --border: rgba(255,255,255,0.1);
-      --text: #f0f0ed;
-      --text2: #999;
-      --text3: #555;
-      --green: #4ade80;
-      --green-bg: #14532d44;
-      --red: #f87171;
-      --red-bg: #7f1d1d44;
-      --hormiga: #fbbf24;
-      --hormiga-bg: #78350f44;
-      --accent: #60a5fa;
-    }
+    --bg: #0a0a12;
+    --surface: #16161f;
+    --surface2: #1d1d29;
+    --border: rgba(255,255,255,0.08);
+    --text: #f5f6fa;
+    --text2: #9093a8;
+    --text3: #5c5f74;
+    --green: #34d399;
+    --green-bg: #0f2e26;
+    --red: #f87171;
+    --red-bg: #3a1414;
+    --hormiga: #fbbf24;
+    --hormiga-bg: #2a2410;
+    --accent: #7c6ff5;
+    --accent2: #4d7cf5;
+    --radius: 18px;
+    --radius-sm: 12px;
   }
 
   body {
@@ -63,9 +45,8 @@
   }
 
   header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0.875rem 1.25rem;
+    background: var(--bg);
+    padding: 0.875rem 1.25rem 0;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -73,56 +54,70 @@
     justify-content: space-between;
     align-items: center;
   }
-  header h1 { font-size: 17px; font-weight: 600; }
+  header h1 { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
 
   .sync-indicator {
     font-size: 11px;
-    padding: 4px 10px;
+    padding: 4px 10px 4px 8px;
     border-radius: 20px;
     background: var(--surface2);
     color: var(--text3);
-    border: 1px solid var(--border);
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
   }
-  .sync-indicator.syncing { color: var(--accent); border-color: var(--accent); }
-  .sync-indicator.ok      { color: #16a34a;  border-color: #16a34a; }
-  .sync-indicator.error   { color: var(--red);    border-color: var(--red); }
+  .sync-indicator::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text3);
+    flex-shrink: 0;
+  }
+  .sync-indicator.syncing { color: var(--accent2); }
+  .sync-indicator.syncing::before { background: var(--accent2); }
+  .sync-indicator.ok      { color: var(--green); }
+  .sync-indicator.ok::before { background: var(--green); }
+  .sync-indicator.error   { color: var(--red); }
+  .sync-indicator.error::before { background: var(--red); }
 
   .bienvenida {
     text-align: center;
-    padding: 1.5rem 1rem 0.25rem;
+    padding: 1.25rem 1rem 0;
   }
-  .bienvenida h2 { font-size: 22px; font-weight: 700; }
-  .bienvenida p { font-size: 13px; color: var(--text2); margin-top: 4px; text-transform: capitalize; }
+  .bienvenida h2 { font-size: 21px; font-weight: 800; letter-spacing: -.01em; }
+  .bienvenida p { font-size: 13px; color: var(--text2); margin-top: 2px; text-transform: capitalize; }
 
   /* Navegador de mes */
   .mes-nav {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background: var(--bg);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.625rem 1.25rem;
-    margin-top: 1rem;
+    padding: 0.625rem 1.25rem 0.25rem;
+    margin-top: 0.5rem;
   }
   .mes-nav button {
-    background: none;
+    background: var(--surface2);
     border: none;
-    font-size: 20px;
+    width: 30px; height: 30px;
+    font-size: 17px;
     color: var(--text2);
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
+    border-radius: 50%;
   }
-  .mes-nav button:active { background: var(--surface2); }
+  .mes-nav button:active { opacity: 0.7; }
   .mes-nav button:disabled { opacity: 0.25; cursor: default; }
-  .mes-label { font-size: 15px; font-weight: 600; text-transform: capitalize; }
+  .mes-label { font-size: 14px; font-weight: 700; text-transform: capitalize; }
   .mes-actual-tag {
-    font-size: 10px;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 20px;
-    padding: 1px 7px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border-radius: 999px;
+    padding: 2px 7px;
     margin-left: 6px;
     vertical-align: middle;
   }
@@ -130,32 +125,41 @@
   .main { padding: 1rem 1rem 0; max-width: 480px; margin: 0 auto; }
 
   .disponible-card {
-    background: linear-gradient(135deg, var(--accent), #1d4ed8);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    text-align: center;
+    background: linear-gradient(135deg, var(--accent2), var(--accent) 65%, #9b7cf7);
+    border-radius: 26px;
+    padding: 1.5rem 1.5rem 1.4rem;
     margin-bottom: 0.75rem;
     border: none;
-    box-shadow: 0 6px 18px rgba(37,99,235,0.28);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 20px 40px -18px rgba(124, 111, 245, 0.55);
+  }
+  .disponible-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 88% -10%, rgba(255,255,255,0.25), transparent 55%);
+    pointer-events: none;
   }
   .disponible-card.negativo {
     background: linear-gradient(135deg, var(--red), #b91c1c);
-    box-shadow: 0 6px 18px rgba(220,38,38,0.28);
+    box-shadow: 0 20px 40px -18px rgba(220,38,38,0.5);
   }
-  .disponible-label { font-size: 11px; color: rgba(255,255,255,0.75); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
-  .disponible-amount { font-size: 34px; font-weight: 700; letter-spacing: -1px; color: #fff; }
-  .disponible-sub { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 8px; }
-  .disponible-pordia { font-size: 15px; font-weight: 600; color: #fff; margin-top: 6px; }
+  .disponible-label { font-size: 12px; color: rgba(255,255,255,0.75); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+  .disponible-amount { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: #fff; font-variant-numeric: tabular-nums; }
+  .disponible-sub { font-size: 12.5px; color: rgba(255,255,255,0.8); margin-top: 6px; }
+  .disponible-pordia { font-size: 14px; font-weight: 700; color: #fff; margin-top: 3px; }
 
-  .disponible-progress-wrap { margin-top: 12px; }
-  .disponible-progress-label { font-size: 11px; color: rgba(255,255,255,0.85); margin-bottom: 6px; }
-  .disponible-progress { background: rgba(255,255,255,0.25); border-radius: 999px; height: 7px; overflow: hidden; }
+  .disponible-progress-wrap { margin-top: 14px; }
+  .disponible-progress-label { font-size: 11px; color: rgba(255,255,255,0.7); margin-bottom: 5px; }
+  .disponible-progress { background: rgba(255,255,255,0.22); border-radius: 999px; height: 5px; overflow: hidden; }
   .disponible-progress-bar { height: 100%; background: #fff; border-radius: 999px; transition: width .3s ease; }
 
   .disponible-edit-link {
-    font-size: 12px; color: #fff; background: none; border: none;
-    cursor: pointer; margin-top: 10px; font-family: inherit; text-decoration: underline;
-    opacity: 0.9;
+    font-size: 12.5px; font-weight: 700; color: #fff;
+    background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
+    border: none; border-radius: 999px; padding: 8px 16px;
+    cursor: pointer; margin-top: 16px; font-family: inherit;
   }
 
   .sueldo-form { display: none; gap: 8px; margin-top: 10px; }
@@ -174,50 +178,96 @@
   .metric {
     background: var(--surface);
     border-radius: var(--radius-sm);
-    padding: 0.75rem 0.5rem;
-    text-align: center;
+    padding: 0.8rem 0.6rem;
+    text-align: left;
     border: 1px solid var(--border);
   }
-  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
-  .metric-value { font-size: 15px; font-weight: 600; }
+  .metric-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); margin-bottom: 4px; }
+  .metric-value { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .metric-value.green { color: var(--green); }
   .metric-value.red   { color: var(--red); }
 
   .tipo-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
   .tipo-btn {
-    flex: 1; padding: 9px;
+    flex: 1; padding: 10px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--surface2);
     color: var(--text2);
-    font-size: 14px; font-weight: 500;
+    font-size: 13.5px; font-weight: 700;
     cursor: pointer; font-family: inherit;
   }
-  .tipo-btn.active-ingreso { background: var(--green-bg); color: var(--green); border-color: var(--green); }
-  .tipo-btn.active-egreso  { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
+  .tipo-btn.active-ingreso { background: var(--green); color: #08150f; border-color: transparent; }
+  .tipo-btn.active-egreso  { background: var(--red);   color: #fff;    border-color: transparent; }
 
-  .categoria-toggle { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .paso-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text3); margin-bottom: 10px;
+  }
+  .paso-label .requerido { color: var(--accent2); text-transform: none; letter-spacing: normal; }
+
+  .categoria-toggle { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 4px; margin-bottom: 14px; }
   .categoria-btn {
-    padding: 6px 11px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--surface2);
+    background: none;
+    border: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
     color: var(--text2);
-    font-size: 12px; font-weight: 500;
+    font-size: 10.5px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .categoria-btn::before {
+    content: attr(data-emoji);
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    background: var(--surface2);
+    border: 2px solid transparent;
+    transition: transform .1s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .categoria-btn:active::before { transform: scale(0.94); }
+  .categoria-btn.active { color: var(--text); }
+  .categoria-btn.active::before { border-color: #fff; }
+  .categoria-btn.cat-comida.active::before         { box-shadow: 0 0 0 3px #f59e0b; }
+  .categoria-btn.cat-transporte.active::before     { box-shadow: 0 0 0 3px #0ea5e9; }
+  .categoria-btn.cat-vivienda.active::before       { box-shadow: 0 0 0 3px #8b5cf6; }
+  .categoria-btn.cat-ocio.active::before           { box-shadow: 0 0 0 3px #ec4899; }
+  .categoria-btn.cat-ropa.active::before           { box-shadow: 0 0 0 3px #14b8a6; }
+  .categoria-btn.cat-salud.active::before          { box-shadow: 0 0 0 3px #ef4444; }
+  .categoria-btn.cat-suscripciones.active::before  { box-shadow: 0 0 0 3px #6366f1; }
+  .categoria-btn.cat-hormiga.active::before        { box-shadow: 0 0 0 3px #e0a458; }
+  .categoria-btn.cat-otros.active::before          { box-shadow: 0 0 0 3px #64748b; }
+  .categoria-btn.cat-reembolso.active::before      { box-shadow: 0 0 0 3px #2563eb; }
+  .categoria-btn.cat-reajuste.active::before       { box-shadow: 0 0 0 3px #84cc16; }
+
+  .monto-wrap {
+    background: var(--surface2);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex; align-items: baseline; justify-content: center; gap: 3px;
+    margin-bottom: 14px;
+  }
+  .monto-wrap .monto-signo { font-size: 18px; color: var(--text3); font-weight: 700; }
+  .monto-wrap input {
+    border: none; background: transparent; padding: 0;
+    color: var(--text); font-size: 28px; font-weight: 800; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .monto-wrap input:focus { border-color: transparent; }
+
+  .desc-toggle {
+    background: none; border: none; color: var(--accent2);
+    font-size: 13px; font-weight: 600; padding: 0; margin-bottom: 12px;
     cursor: pointer; font-family: inherit;
   }
-  .categoria-btn.active { color: #fff; border-color: transparent; }
-  .categoria-btn.cat-comida.active         { background: #f59e0b; }
-  .categoria-btn.cat-transporte.active     { background: #0ea5e9; }
-  .categoria-btn.cat-vivienda.active       { background: #8b5cf6; }
-  .categoria-btn.cat-ocio.active           { background: #ec4899; }
-  .categoria-btn.cat-ropa.active           { background: #14b8a6; }
-  .categoria-btn.cat-salud.active          { background: #ef4444; }
-  .categoria-btn.cat-suscripciones.active  { background: #6366f1; }
-  .categoria-btn.cat-hormiga.active        { background: #78350f; }
-  .categoria-btn.cat-otros.active          { background: #64748b; }
-  .categoria-btn.cat-reembolso.active      { background: #2563eb; }
-  .categoria-btn.cat-reajuste.active       { background: #84cc16; }
+  .desc-field { display: none; margin-bottom: 10px; }
+  .desc-field.visible { display: block; }
 
   .ocr-status { font-size: 13px; color: var(--text2); text-align: center; padding: 10px 0 0; }
   .ocr-hint   { font-size: 11px; color: var(--text3); margin-top: 6px; text-align: center; }
@@ -335,31 +385,32 @@
   #seccion-lista.colapsada #acciones-lista { display: none; }
 
   .movimiento {
-    display: flex; align-items: center; gap: 10px;
-    padding: 0.875rem 1rem;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0.7rem 1rem;
     border-bottom: 1px solid var(--border);
   }
   .movimiento:last-child { border-bottom: none; }
   .movimiento.hormiga { background: var(--hormiga-bg); }
-  .mov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .mov-dot.ingreso { background: var(--green); }
-  .mov-dot.egreso  { background: var(--red); }
-  .mov-dot.hormiga { background: var(--hormiga); }
+  .mov-icon {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
   .mov-info { flex: 1; min-width: 0; }
-  .mov-desc  { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mov-desc  { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mov-fecha { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .mov-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
+  .mov-amount { font-size: 14px; font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .mov-amount.ingreso { color: var(--green); }
-  .mov-amount.egreso  { color: var(--red); }
+  .mov-amount.egreso  { color: var(--text); }
   .mov-amount.hormiga { color: var(--hormiga); }
 
   .hormiga-banner {
     background: var(--hormiga-bg);
     color: var(--hormiga);
-    border: 1px solid var(--hormiga);
+    border: 1px solid rgba(251,191,36,0.3);
     border-radius: var(--radius-sm);
     padding: 0.65rem 1rem;
-    font-size: 13px;
+    font-size: 12.5px;
     text-align: center;
     margin-bottom: 0.75rem;
   }
@@ -368,10 +419,10 @@
   .gap-banner {
     background: var(--hormiga-bg);
     color: var(--hormiga);
-    border: 1px solid var(--hormiga);
+    border: 1px solid rgba(251,191,36,0.3);
     border-radius: var(--radius-sm);
     padding: 0.65rem 1rem;
-    font-size: 13px;
+    font-size: 12.5px;
     text-align: center;
     margin: 0.75rem 0;
   }
@@ -489,10 +540,15 @@
           <button class="tipo-btn" id="btn-ingreso" onclick="setTipo('ingreso')">+ Ingreso</button>
           <button class="tipo-btn active-egreso" id="btn-egreso" onclick="setTipo('egreso')">− Egreso</button>
         </div>
+        <div class="monto-wrap">
+          <span class="monto-signo">$</span>
+          <input type="number" id="input-monto" placeholder="0" min="0" />
+        </div>
+        <div class="paso-label">Categoría <span class="requerido">· obligatoria</span></div>
         <div class="categoria-toggle" id="categoria-toggle"></div>
-        <input type="text" id="input-desc" placeholder="Descripción" />
-        <div class="row">
-          <input type="number" id="input-monto" placeholder="Monto" min="0" />
+        <button type="button" class="desc-toggle" id="desc-toggle" onclick="toggleDescField()">＋ Agregar descripción (opcional)</button>
+        <div class="desc-field" id="desc-field">
+          <input type="text" id="input-desc" placeholder="ej: Almuerzo con equipo" />
         </div>
         <p class="error-msg" id="error">Completa todos los campos.</p>
         <button class="btn-primary" id="btn-agregar" onclick="agregar()">Agregar</button>
@@ -582,7 +638,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-21.1';
+const APP_VERSION = '2026-09-21.2';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1021,9 +1077,9 @@ function renderCategoriaToggle(t) {
   const cats = CATEGORIAS.filter(c => c.tipos.includes(t));
   const cont = document.getElementById('categoria-toggle');
   cont.innerHTML = cats.map(c =>
-    `<button class="categoria-btn cat-${c.id}" onclick="setCategoria('${c.id}')">${c.emoji} ${c.label}</button>`
+    `<button class="categoria-btn cat-${c.id}" data-emoji="${c.emoji}" onclick="setCategoria('${c.id}')">${c.label}</button>`
   ).join('');
-  cont.style.display = cats.length ? 'flex' : 'none';
+  cont.style.display = cats.length ? 'grid' : 'none';
   // No se preselecciona ninguna: en egreso hay que elegirla a mano antes
   // de poder guardar (ver agregar()).
   const catValida = cats.some(c => c.id === categoria);
@@ -1071,6 +1127,24 @@ const COLOR_CATEGORIA = {
   suscripciones: '#6366f1',
   hormiga: '#78350f',
   otros: '#64748b',
+  reajuste: '#84cc16',
+};
+
+// Para los ícono circulares en la lista de movimientos y la grilla de
+// categorías: tonos más claros que COLOR_CATEGORIA (pensada para el
+// gráfico de torta de la imagen descargable, que tiene fondo blanco), así
+// se distinguen bien sobre el fondo oscuro de la app.
+const COLOR_CATEGORIA_UI = {
+  comida: '#f59e0b',
+  transporte: '#0ea5e9',
+  vivienda: '#8b5cf6',
+  ocio: '#ec4899',
+  ropa: '#14b8a6',
+  salud: '#ef4444',
+  suscripciones: '#6366f1',
+  hormiga: '#e0a458',
+  otros: '#64748b',
+  reembolso: '#2563eb',
   reajuste: '#84cc16',
 };
 
@@ -1275,6 +1349,18 @@ function toggleSueldoForm() {
   document.getElementById('sueldo-form').classList.toggle('visible');
 }
 
+function mostrarDescField(visible) {
+  document.getElementById('desc-field').classList.toggle('visible', visible);
+  document.getElementById('desc-toggle').textContent =
+    visible ? '－ Ocultar descripción' : '＋ Agregar descripción (opcional)';
+}
+
+function toggleDescField() {
+  const visible = !document.getElementById('desc-field').classList.contains('visible');
+  mostrarDescField(visible);
+  if (visible) document.getElementById('input-desc').focus();
+}
+
 async function setSaldoActual() {
   const v = parseFloat(document.getElementById('input-sueldo').value);
   if (isNaN(v) || v < 0) return;
@@ -1421,9 +1507,11 @@ function actualizarUI() {
       const cat = CATEGORIAS.find(c => c.id === catId);
       const etiqueta = cat ? `${cat.emoji} ${cat.label}` : (m[1] === 'ingreso' ? 'Ingreso' : 'Egreso');
       const esHormiga = catId === 'hormiga';
+      const colorIcon = COLOR_CATEGORIA_UI[catId] || (m[1] === 'ingreso' ? '#34d399' : '#64748b');
+      const iconChar  = cat ? cat.emoji : (m[1] === 'ingreso' ? '💰' : '💸');
       return `
       <div class="movimiento${esHormiga ? ' hormiga' : ''}">
-        <div class="mov-dot ${m[1]}${esHormiga ? ' hormiga' : ''}"></div>
+        <div class="mov-icon" style="background:${colorIcon}26; color:${colorIcon};">${iconChar}</div>
         <div class="mov-info${esHoy ? ' editable' : ''}"${esHoy ? ` onclick="iniciarEdicion('${m[0]}')"` : ''}>
           <div class="mov-desc">${desc}</div>
           <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${etiqueta}</div>
@@ -1478,6 +1566,7 @@ async function agregar() {
   } else {
     document.getElementById('input-desc').value  = '';
     document.getElementById('input-monto').value = '';
+    mostrarDescField(false);
     const fecha = toDateStr(new Date());
     await post({ action: 'add', id: Date.now(), tipo, desc: descFinal, monto, fecha });
   }
@@ -1501,6 +1590,9 @@ function iniciarEdicion(id) {
   document.getElementById('error').style.display = 'none';
   document.getElementById('btn-agregar').textContent = 'Guardar cambios';
   document.getElementById('btn-cancelar-edicion').style.display = 'block';
+  // Si ya tenía una descripción escrita, se muestra el campo abierto para
+  // no esconder algo que el usuario ya había completado.
+  mostrarDescField(!!desc);
 
   document.getElementById('bloque-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.getElementById('input-desc').focus();
@@ -1512,6 +1604,7 @@ function cancelarEdicion() {
   document.getElementById('input-monto').value = '';
   document.getElementById('btn-agregar').textContent = 'Agregar';
   document.getElementById('btn-cancelar-edicion').style.display = 'none';
+  mostrarDescField(false);
   setTipo('egreso');
 }
 
