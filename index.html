@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.3" />
+<meta name="app-version" content="2026-09-22.4" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -509,6 +509,10 @@
       padding: 1.5rem 2rem 0;
       min-height: calc(100vh - 12rem);
     }
+    /* Usado brevemente por sincronizarAlturaColumnas() para medir el alto
+       NATURAL de cada columna (sin que el stretch de arriba infle una con
+       el contenido de la otra) antes de calcular el tope de la lista. */
+    .main.midiendo-alturas { align-items: start; }
     .columna-izq, .columna-der {
       display: flex;
       flex-direction: column;
@@ -536,10 +540,11 @@
       flex-direction: column;
       min-height: 0;
     }
-    /* Tope independiente de la columna izquierda: por más larga que sea la
-       lista (o la columna izquierda), nunca crece sin límite — pasado este
-       alto, scrollea internamente en vez de empujar el resto de la página. */
-    .columna-der > #seccion-lista #lista { flex: 1; overflow-y: auto; max-height: calc(100vh - 19rem); }
+    /* El tope de alto de la lista (para que scrollee en vez de crecer sin
+       límite) se calcula en JS a partir de la altura real de la columna
+       izquierda — ver sincronizarAlturaColumnas() — porque en CSS no hay
+       forma de "capar" una columna a la altura de su hermana. */
+    .columna-der > #seccion-lista #lista { flex: 1; overflow-y: auto; }
     .disponible-amount { font-size: 46px; }
     .categoria-toggle { grid-template-columns: repeat(5, 1fr); }
 
@@ -591,7 +596,7 @@
   <div class="columna-izq">
 
   <div class="disponible-card" id="disponible-card">
-    <button class="disponible-eye" id="btn-toggle-montos-disponible" onclick="toggleMontos()" aria-label="Mostrar u ocultar el saldo">🙈</button>
+    <button class="disponible-eye" id="btn-toggle-montos-disponible" onclick="toggleSaldo()" aria-label="Mostrar u ocultar el saldo">🙈</button>
     <div class="disponible-label">Disponible</div>
     <div class="disponible-amount" id="disponible-amount">$0</div>
     <div class="disponible-sub" id="disponible-sub"></div>
@@ -740,7 +745,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.3';
+const APP_VERSION = '2026-09-22.4';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -788,9 +793,12 @@ function esDesktop() { return window.innerWidth >= 900; }
 // En escritorio la lista arranca desplegada (ahí siempre hay espacio y
 // scroll interno); en mobile sigue partiendo plegada como siempre.
 let listaAbierta   = esDesktop();
-// Por privacidad: al abrir la app los montos de la lista empiezan
-// tapados, para que alguien mirando la pantalla no los vea altiro.
+// Por privacidad: al abrir la app los montos de la lista y el saldo
+// disponible empiezan tapados, para que alguien mirando la pantalla no los
+// vea altiro. Son dos botones (ojo) independientes entre sí a propósito:
+// tapar uno no debe tapar el otro.
 let montosOcultos  = true;
+let saldoOculto    = true;
 let editandoId     = null;
 let toastTimeout   = null;
 let saldoTopeActual = null; // saldo más reciente detectado en la última foto procesada
@@ -1422,7 +1430,7 @@ function actualizarDisponible() {
     pordiaEl.textContent = '';
     progWrap.style.display = 'none';
   } else {
-    el.textContent = montosOcultos ? '••••••' : fmt(saldoActual);
+    el.textContent = saldoOculto ? '••••••' : fmt(saldoActual);
     tarjeta.classList.toggle('negativo', saldoActual < 0);
     subEl.textContent = `${diasRestantes} día${diasRestantes===1?'':'s'} hasta el ${fin.getDate()} ${MESES[fin.getMonth()].toLowerCase().slice(0,3)}`;
 
@@ -1431,7 +1439,7 @@ function actualizarDisponible() {
     // nuevos — y además se recalcula de inmediato si cambia el saldo (un
     // ingreso o egreso).
     const porDia = saldoActual / diasRestantes;
-    pordiaEl.textContent = montosOcultos
+    pordiaEl.textContent = saldoOculto
       ? `•••• por día hasta el ${fin.getDate()}`
       : `${fmt(porDia)} por día hasta el ${fin.getDate()}`;
 
@@ -1511,9 +1519,13 @@ function toggleLista() {
 
 function toggleMontos() {
   montosOcultos = !montosOcultos;
-  const icono = montosOcultos ? '🙈' : '👁️';
-  document.getElementById('btn-toggle-montos').textContent = icono;
-  document.getElementById('btn-toggle-montos-disponible').textContent = icono;
+  document.getElementById('btn-toggle-montos').textContent = montosOcultos ? '🙈' : '👁️';
+  actualizarUI();
+}
+
+function toggleSaldo() {
+  saldoOculto = !saldoOculto;
+  document.getElementById('btn-toggle-montos-disponible').textContent = saldoOculto ? '🙈' : '👁️';
   actualizarUI();
 }
 
@@ -1645,6 +1657,41 @@ function actualizarUI() {
     }).join('');
     aplicarEstadoLista();
   }
+
+  sincronizarAlturaColumnas();
+}
+
+// En escritorio, iguala la altura de la columna derecha a la de la
+// izquierda (que es la que manda: ahí vive "Nuevo movimiento"), dejando
+// que la lista de movimientos scrollee internamente si no alcanza el
+// espacio. CSS por sí solo no puede "capar" una columna a la altura de su
+// hermana (align-items:stretch solo estira la más corta), así que se mide
+// en JS después de cada render.
+function sincronizarAlturaColumnas() {
+  const lista = document.getElementById('lista');
+  if (!lista) return;
+  if (!esDesktop()) {
+    lista.style.maxHeight = '';
+    return;
+  }
+  const main = document.querySelector('.main');
+  const izq  = document.querySelector('.columna-izq');
+  const der  = document.querySelector('.columna-der');
+  if (!main || !izq || !der) return;
+
+  // Se resetea antes de medir para no arrastrar un tope calculado antes
+  // (si no, "el resto de la columna derecha" se mediría ya recortado). Y se
+  // desactiva el stretch un instante: si no, cuando la derecha es
+  // naturalmente más alta que la izquierda, el propio stretch ya habría
+  // inflado el alto medido de la izquierda al de la derecha, dejando el
+  // tope calculado sin efecto.
+  lista.style.maxHeight = '';
+  main.classList.add('midiendo-alturas');
+  const alturaIzq          = izq.getBoundingClientRect().height;
+  const alturaDerSinLista  = der.getBoundingClientRect().height - lista.getBoundingClientRect().height;
+  main.classList.remove('midiendo-alturas');
+  const topeLista          = alturaIzq - alturaDerSinLista;
+  if (topeLista > 100) lista.style.maxHeight = topeLista + 'px';
 }
 
 async function agregar() {
@@ -1904,6 +1951,15 @@ setInterval(cargar, 30000);
 document.getElementById('input-desc').addEventListener('keydown',  e => { if (e.key==='Enter') document.getElementById('input-monto').focus(); });
 document.getElementById('input-monto').addEventListener('keydown', e => { if (e.key==='Enter') agregar(); });
 document.getElementById('input-sueldo').addEventListener('keydown', e => { if (e.key==='Enter') setSaldoActual(); });
+
+// Al cambiar el tamaño de la ventana (o rotar/redimensionar en un
+// tablet) puede cambiar tanto si se está en escritorio como la altura
+// real de la columna izquierda, así que se vuelve a calcular el tope.
+let resizeTimeout = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(sincronizarAlturaColumnas, 150);
+});
 </script>
 </body>
 </html>
