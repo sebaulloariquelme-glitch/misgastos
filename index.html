@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-21.3" />
+<meta name="app-version" content="2026-09-22.1" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -616,6 +616,7 @@
     <div class="lista-header">
       <span class="lista-title" id="lista-titulo">Movimientos</span>
       <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn-ghost" id="btn-toggle-montos" style="padding:5px 10px;font-size:12px;" onclick="toggleMontos()">🙈</button>
         <button class="btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="descargarResumenImagen()">⬇ Imagen</button>
         <button class="btn-ghost" id="btn-toggle-lista" style="padding:5px 10px;font-size:12px;" onclick="toggleLista()">▾</button>
       </div>
@@ -640,7 +641,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-21.3';
+const APP_VERSION = '2026-09-22.1';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -685,6 +686,9 @@ let tipo         = 'egreso';
 let categoria    = null; // sin categoría elegida hasta que el usuario toque una
 let mesOffset    = 0; // 0 = mes actual, -1 = mes anterior, etc.
 let listaAbierta   = false;
+// Por privacidad: al abrir la app los montos de la lista empiezan
+// tapados, para que alguien mirando la pantalla no los vea altiro.
+let montosOcultos  = true;
 let editandoId     = null;
 let toastTimeout   = null;
 let saldoTopeActual = null; // saldo más reciente detectado en la última foto procesada
@@ -1401,6 +1405,12 @@ function toggleLista() {
   aplicarEstadoLista();
 }
 
+function toggleMontos() {
+  montosOcultos = !montosOcultos;
+  document.getElementById('btn-toggle-montos').textContent = montosOcultos ? '🙈' : '👁️';
+  actualizarUI();
+}
+
 function aplicarEstadoLista() {
   document.getElementById('seccion-lista').classList.toggle('colapsada', !listaAbierta);
   document.getElementById('btn-toggle-lista').textContent = listaAbierta ? '▴' : '▾';
@@ -1511,6 +1521,7 @@ function actualizarUI() {
       const esHormiga = catId === 'hormiga';
       const colorIcon = COLOR_CATEGORIA_UI[catId] || (m[1] === 'ingreso' ? '#34d399' : '#64748b');
       const iconChar  = cat ? cat.emoji : (m[1] === 'ingreso' ? '💰' : '💸');
+      const montoTexto = montosOcultos ? '••••••' : `${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}`;
       return `
       <div class="movimiento${esHormiga ? ' hormiga' : ''}">
         <div class="mov-icon" style="background:${colorIcon}26; color:${colorIcon};">${iconChar}</div>
@@ -1518,7 +1529,7 @@ function actualizarUI() {
           <div class="mov-desc">${desc}</div>
           <div class="mov-fecha">${fmtFecha(String(m[4]))} · ${etiqueta}</div>
         </div>
-        <div class="mov-amount ${m[1]}${esHormiga ? ' hormiga' : ''}">${m[1]==='ingreso'?'+':'−'}${fmt(parseFloat(m[3]))}</div>
+        <div class="mov-amount ${m[1]}${esHormiga ? ' hormiga' : ''}">${montoTexto}</div>
         ${esHoy ? `<button class="mov-del" onclick="eliminar('${m[0]}')">✕</button>` : ''}
       </div>
     `;
