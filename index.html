@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.1" />
+<meta name="app-version" content="2026-09-22.2" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -475,6 +475,68 @@
     margin-bottom: 0.75rem;
     border: 1px solid var(--border);
   }
+
+  /* En mobile las columnas no cambian nada del apilado de siempre. */
+  .columna-izq, .columna-der { display: contents; }
+
+  /* --- Escritorio: dos columnas tipo bento, cuadros uniformes --- */
+  @media (min-width: 900px) {
+    .main {
+      max-width: 1080px;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      align-items: stretch;
+      gap: 1.25rem;
+      padding: 1.5rem 2rem 0;
+      min-height: calc(100vh - 12rem);
+    }
+    .columna-izq, .columna-der {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    /* Un solo ritmo de espaciado entre tarjetas (reemplaza los distintos
+       margin-bottom heredados del apilado mobile). */
+    .columna-izq > *, .columna-der > * { margin-bottom: 0; }
+    /* Las dos columnas terminan a la misma altura: el bloque final visible
+       de cada una crece para ocupar lo que sobra (en vez de quedar una
+       columna más corta que la otra). En la lista, el scroll interno se
+       encarga de lo que no entra. Se apunta por id en vez de :last-child
+       porque el último elemento del DOM a veces está oculto (p.ej. "vacio"
+       cuando sí hay movimientos, o "readonly-notice" en el mes actual). */
+    .columna-izq > #bloque-formulario,
+    .columna-izq > #readonly-notice,
+    .columna-der > #seccion-lista,
+    .columna-der > #vacio {
+      flex: 1;
+    }
+    .columna-izq > #bloque-formulario { display: flex; flex-direction: column; }
+    .columna-izq > #bloque-formulario > .section,
+    .columna-der > #seccion-lista {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .columna-der > #seccion-lista #lista { flex: 1; overflow-y: auto; }
+    .disponible-amount { font-size: 46px; }
+    .categoria-toggle { grid-template-columns: repeat(5, 1fr); }
+
+    /* Mismo radio de esquina y borde en todas las tarjetas, para que se
+       lean como un mismo set de módulos (estética bento). */
+    .disponible-card, .metric, .hormiga-banner, .gap-banner, .section {
+      border-radius: 20px;
+    }
+    .disponible-card { border: 1px solid rgba(255,255,255,0.12); }
+    .metric {
+      padding: 1rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .hormiga-banner, .gap-banner { padding: 1rem 1.1rem; }
+    .metrics { gap: 1.25rem; }
+  }
 </style>
 </head>
 <body>
@@ -499,6 +561,7 @@
 </div>
 
 <div class="main">
+  <div class="columna-izq">
 
   <div class="disponible-card" id="disponible-card">
     <div class="disponible-label">Disponible</div>
@@ -557,7 +620,17 @@
         <button class="btn-ghost" id="btn-cancelar-edicion" style="display:none; width:100%; margin-top:8px;" onclick="cancelarEdicion()">Cancelar edición</button>
       </div>
     </div>
+  </div>
 
+  <div class="readonly-notice" id="readonly-notice" style="display:none;">
+    Vista de solo lectura — los movimientos no se pueden editar en meses pasados.
+  </div>
+
+  </div>
+  <div class="columna-der">
+
+  <!-- Solo visible en mes actual -->
+  <div id="bloque-importar">
     <div class="section">
       <div class="section-header">Importar desde foto</div>
       <div class="section-body">
@@ -606,10 +679,6 @@
     </div>
   </div>
 
-  <div class="readonly-notice" id="readonly-notice" style="display:none;">
-    Vista de solo lectura — los movimientos no se pueden editar en meses pasados.
-  </div>
-
   <div class="loading" id="loading">Conectando con Google Sheets...</div>
 
   <div class="section" id="seccion-lista" style="display:none;">
@@ -629,6 +698,8 @@
 
   <p class="empty" id="vacio" style="display:none;">Sin movimientos este mes.</p>
 
+  </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -641,7 +712,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.1';
+const APP_VERSION = '2026-09-22.2';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1469,8 +1540,9 @@ function actualizarUI() {
   document.getElementById('mes-tag').style.display = esHoy ? 'inline' : 'none';
   document.getElementById('btn-next').disabled = esHoy;
 
-  // Formulario solo en mes actual
+  // Formulario e importar foto solo en mes actual
   document.getElementById('bloque-formulario').style.display = esHoy ? 'block' : 'none';
+  document.getElementById('bloque-importar').style.display   = esHoy ? 'block' : 'none';
   document.getElementById('readonly-notice').style.display   = esHoy ? 'none' : 'block';
   document.getElementById('acciones-lista').style.display    = esHoy ? 'flex' : 'none';
 
