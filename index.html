@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.6" />
+<meta name="app-version" content="2026-09-22.7" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -773,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.6';
+const APP_VERSION = '2026-09-22.7';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1707,19 +1707,24 @@ function sincronizarAlturaColumnas() {
   const der  = document.querySelector('.columna-der');
   if (!main || !izq || !der) return;
 
-  // Se resetea antes de medir para no arrastrar un tope calculado antes
-  // (si no, "el resto de la columna derecha" se mediría ya recortado). Y se
-  // desactiva el stretch un instante: si no, cuando la derecha es
-  // naturalmente más alta que la izquierda, el propio stretch ya habría
-  // inflado el alto medido de la izquierda al de la derecha, dejando el
-  // tope calculado sin efecto.
-  lista.style.maxHeight = '';
+  // La lista se colapsa a 0 (en vez de sacarle el tope del todo) ANTES de
+  // medir: con muchos movimientos, dejarla sin tope durante la medición
+  // puede inflar la página entera a miles de píxeles por un instante, lo
+  // que en algunos navegadores hace aparecer/desaparecer el scrollbar y
+  // cambia el ancho disponible — ensuciando la medición con un ancho
+  // distinto al que se usa después, cuando la lista ya quedó acotada. Con
+  // la lista en 0 nunca se llega a inflar nada, y "el resto de la columna
+  // derecha" se lee directo (sin restar nada). También se desactiva el
+  // stretch un instante: si no, cuando la derecha es naturalmente más alta
+  // que la izquierda, el propio stretch ya habría inflado el alto medido
+  // de la izquierda al de la derecha, dejando el tope calculado sin efecto.
+  lista.style.maxHeight = '0px';
   main.classList.add('midiendo-alturas');
   const alturaIzq          = izq.getBoundingClientRect().height;
-  const alturaDerSinLista  = der.getBoundingClientRect().height - lista.getBoundingClientRect().height;
+  const alturaDerSinLista  = der.getBoundingClientRect().height;
   main.classList.remove('midiendo-alturas');
   const topeLista          = alturaIzq - alturaDerSinLista;
-  if (topeLista > 100) lista.style.maxHeight = topeLista + 'px';
+  lista.style.maxHeight = topeLista > 100 ? topeLista + 'px' : '';
 }
 
 async function agregar() {
