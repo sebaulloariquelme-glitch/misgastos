@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.8" />
+<meta name="app-version" content="2026-09-22.9" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -773,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.8';
+const APP_VERSION = '2026-09-22.9';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1623,10 +1623,11 @@ function actualizarUI() {
   document.getElementById('readonly-notice').style.display   = esHoy ? 'none' : 'block';
   document.getElementById('acciones-lista').style.display    = esHoy ? 'flex' : 'none';
 
-  // Ingresos y egresos del mes que se está viendo
+  // Ingresos y egresos del mes que se está viendo (se tapan junto con el
+  // saldo disponible: es la misma información sensible)
   const { ingresos, egresos } = calcMovimientosMes(mes.key);
-  document.getElementById('lbl-ingresos').textContent = fmt(ingresos);
-  document.getElementById('lbl-egresos').textContent  = fmt(egresos);
+  document.getElementById('lbl-ingresos').textContent = saldoOculto ? '••••••' : fmt(ingresos);
+  document.getElementById('lbl-egresos').textContent  = saldoOculto ? '••••••' : fmt(egresos);
 
   // Gasto hormiga del mes: se destaca aparte para notar cuánto suman
   const gastoHormiga = calcGastoHormigaMes(mes.key);
