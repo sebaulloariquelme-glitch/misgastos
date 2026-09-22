@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.4" />
+<meta name="app-version" content="2026-09-22.5" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -500,14 +500,23 @@
 
   /* --- Escritorio: dos columnas tipo bento, cuadros uniformes --- */
   @media (min-width: 900px) {
+    /* Todo lo de arriba del main (header, saludo, navegador de mes) se
+       achica bastante: en escritorio es contenido de bajo valor que no
+       debería empujar "Agregar" fuera de la pantalla sin hacer scroll. */
+    header { padding: 0.4rem 2rem 0; }
+    .bienvenida { padding: 0.3rem 1rem 0; }
+    .bienvenida h2 { font-size: 16px; }
+    .bienvenida p { font-size: 11.5px; margin-top: 0; }
+    .mes-nav { padding: 0.2rem 1.25rem 0.1rem; margin-top: 0.1rem; }
+
     .main {
       max-width: 1080px;
       display: grid;
       grid-template-columns: 400px 1fr;
       align-items: stretch;
-      gap: 1.25rem;
-      padding: 1.5rem 2rem 0;
-      min-height: calc(100vh - 12rem);
+      gap: 0.7rem;
+      padding: 0.7rem 2rem 0;
+      min-height: calc(100vh - 7rem);
     }
     /* Usado brevemente por sincronizarAlturaColumnas() para medir el alto
        NATURAL de cada columna (sin que el stretch de arriba infle una con
@@ -516,7 +525,7 @@
     .columna-izq, .columna-der {
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
+      gap: 0.7rem;
     }
     /* Un solo ritmo de espaciado entre tarjetas (reemplaza los distintos
        margin-bottom heredados del apilado mobile). */
@@ -545,8 +554,10 @@
        izquierda — ver sincronizarAlturaColumnas() — porque en CSS no hay
        forma de "capar" una columna a la altura de su hermana. */
     .columna-der > #seccion-lista #lista { flex: 1; overflow-y: auto; }
-    .disponible-amount { font-size: 46px; }
+    .disponible-amount { font-size: 40px; }
     .categoria-toggle { grid-template-columns: repeat(5, 1fr); }
+    .categoria-btn { gap: 4px; }
+    .categoria-btn::before { width: 40px; height: 40px; font-size: 18px; }
 
     /* La lista de movimientos siempre queda desplegada en escritorio (con
        los montos tapados por defecto vía el botón del ojo); no tiene
@@ -558,16 +569,33 @@
     .disponible-card, .metric, .hormiga-banner, .gap-banner, .section {
       border-radius: 20px;
     }
-    .disponible-card { border: 1px solid rgba(255,255,255,0.12); }
+    .disponible-card {
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 0.95rem 1.3rem 0.85rem;
+    }
+    .disponible-label { margin-bottom: 5px; }
+    .disponible-progress-wrap { margin-top: 8px; }
+    .disponible-edit-link { margin-top: 10px; padding: 7px 14px; }
     .metric {
-      padding: 1rem 1.1rem;
+      padding: 0.6rem 1.1rem;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       justify-content: center;
     }
-    .hormiga-banner, .gap-banner { padding: 1rem 1.1rem; }
-    .metrics { gap: 1.25rem; }
+    .hormiga-banner, .gap-banner { padding: 0.6rem 1.1rem; }
+    .metrics { gap: 0.7rem; }
+
+    /* La tarjeta "Nuevo movimiento" es la que fija el alto de todo el
+       bento (ver sincronizarAlturaColumnas()), así que compactarla es lo
+       que más ayuda a que "Agregar" quede a la vista sin hacer scroll. */
+    .section-header { padding: 0.55rem 1rem 0.45rem; }
+    .section-body { padding: 0.7rem 1rem; }
+    .tipo-toggle { margin-bottom: 6px; }
+    .monto-wrap { padding: 9px; }
+    .paso-label { margin-bottom: 6px; }
+    .categoria-toggle { gap: 7px 4px; margin-bottom: 8px; }
+    .desc-toggle { margin-bottom: 6px; }
   }
 </style>
 </head>
@@ -745,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.4';
+const APP_VERSION = '2026-09-22.5';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
