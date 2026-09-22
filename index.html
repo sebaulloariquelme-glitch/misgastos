@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.7" />
+<meta name="app-version" content="2026-09-22.8" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -773,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.7';
+const APP_VERSION = '2026-09-22.8';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1980,6 +1980,15 @@ if (cacheInicial) {
 setTipo('egreso');
 cargar();
 setInterval(cargar, 30000);
+
+// Red de seguridad ante el primer load: si algo deja el cálculo de altura
+// un poco desactualizado justo después de pintar la página por primera vez
+// (un ícono/emoji que tarda en asentarse, el segundo render con los datos
+// reales llegando después del cache), se vuelve a sincronizar unas veces
+// más en los primeros segundos — sin esperar a que algo dispare el
+// ResizeObserver o a la próxima actualizarUI().
+setTimeout(sincronizarAlturaColumnas, 800);
+setTimeout(sincronizarAlturaColumnas, 2500);
 
 document.getElementById('input-desc').addEventListener('keydown',  e => { if (e.key==='Enter') document.getElementById('input-monto').focus(); });
 document.getElementById('input-monto').addEventListener('keydown', e => { if (e.key==='Enter') agregar(); });
