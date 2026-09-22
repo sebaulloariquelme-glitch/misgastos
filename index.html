@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.5" />
+<meta name="app-version" content="2026-09-22.6" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -773,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.5';
+const APP_VERSION = '2026-09-22.6';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1980,14 +1980,30 @@ document.getElementById('input-desc').addEventListener('keydown',  e => { if (e.
 document.getElementById('input-monto').addEventListener('keydown', e => { if (e.key==='Enter') agregar(); });
 document.getElementById('input-sueldo').addEventListener('keydown', e => { if (e.key==='Enter') setSaldoActual(); });
 
-// Al cambiar el tamaño de la ventana (o rotar/redimensionar en un
-// tablet) puede cambiar tanto si se está en escritorio como la altura
-// real de la columna izquierda, así que se vuelve a calcular el tope.
-let resizeTimeout = null;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(sincronizarAlturaColumnas, 150);
-});
+// Se re-sincroniza cada vez que el alto REAL de la columna izquierda
+// cambia, sea cual sea la razón (cambia el ancho de la ventana, el zoom
+// del navegador, una fuente que termina de cargar, etc.) — más confiable
+// que tratar de adivinar en qué momentos puntuales hay que recalcular.
+if (window.ResizeObserver) {
+  const columnaIzq = document.querySelector('.columna-izq');
+  if (columnaIzq) {
+    let pendiente = false;
+    const observadorAlturaIzq = new ResizeObserver(() => {
+      if (pendiente) return;
+      pendiente = true;
+      requestAnimationFrame(() => { pendiente = false; sincronizarAlturaColumnas(); });
+    });
+    observadorAlturaIzq.observe(columnaIzq);
+  }
+} else {
+  // Navegadores muy antiguos sin ResizeObserver: al menos recalcular al
+  // cambiar el tamaño de la ventana.
+  let resizeTimeout = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(sincronizarAlturaColumnas, 150);
+  });
+}
 </script>
 </body>
 </html>
