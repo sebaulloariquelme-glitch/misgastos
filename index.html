@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-22.9" />
+<meta name="app-version" content="2026-09-25.1" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -773,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-22.9';
+const APP_VERSION = '2026-09-25.1';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -921,6 +921,52 @@ const RE_MONTO_INLINE = /([+\-])\s?(?:5?\$|[Ss5])?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4
 // encabezados como "Saldo disponible" / "Saldo contable".
 const RE_SALDO_LINEA = /saldo\s*:?\s*\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/i;
 
+// --- Formato tabla de estado de cuenta ("Fecha | Descripción | Cargo | Abono") ---
+// El OCR de una tabla como esta la lee por COLUMNA, no por fila: primero
+// todas las fechas de arriba a abajo, después todas las descripciones, y
+// después todos los montos (Cargo y Abono quedan mezclados en una sola
+// columna porque en cada fila solo una de las dos celdas tiene contenido).
+// Como no hay ningún +/- ni "saldo:" para guiarse, la dirección del
+// movimiento sale del propio texto: "Transf. de X" = plata que entró
+// (ingreso), "Transf. para X" = plata que salió (egreso).
+const RE_FECHA_TABLA = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
+const RE_TRANSF_TABLA = /^transf\.?\s*(de|para)\s+(.+)$/i;
+const RE_MONTO_TABLA = /^\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})$/;
+
+function parsearTablaEstadoCuenta(lineas) {
+  const fechas = [];
+  const filasDesc = [];
+  const montos = [];
+  for (const linea of lineas) {
+    const mFecha = linea.match(RE_FECHA_TABLA);
+    if (mFecha) { fechas.push(`${mFecha[3]}-${pad(+mFecha[2])}-${pad(+mFecha[1])}`); continue; }
+    const mTransf = linea.match(RE_TRANSF_TABLA);
+    if (mTransf) {
+      filasDesc.push({
+        desc: `Transf. ${mTransf[1].toLowerCase()} ${mTransf[2]}`.trim(),
+        tipo: mTransf[1].toLowerCase() === 'de' ? 'ingreso' : 'egreso',
+      });
+      continue;
+    }
+    const mMonto = linea.match(RE_MONTO_TABLA);
+    if (mMonto) { montos.push(parseInt(mMonto[1].replace(/[.,]/g, ''), 10)); continue; }
+  }
+  // Solo se usa esta lectura si las tres columnas detectadas tienen
+  // exactamente la misma cantidad de filas (y al menos 2): si al OCR se le
+  // escapó una fecha o un monto en el medio, cruzarlas igual por posición
+  // dejaría movimientos con el monto o la fecha de la fila equivocada —
+  // preferible no detectar nada a inventar un cruce que puede estar mal.
+  if (fechas.length < 2 || fechas.length !== filasDesc.length || fechas.length !== montos.length) return null;
+  return fechas.map((fecha, i) => ({
+    desc: filasDesc[i].desc,
+    monto: montos[i],
+    tipo: filasDesc[i].tipo,
+    categoria: 'otros',
+    fecha,
+    saldoDespues: null,
+  }));
+}
+
 // Recorre el texto del OCR línea por línea y arma un bloque por movimiento:
 // descripción (líneas sueltas antes del monto), monto/tipo si se detectó un
 // signo +/- explícito, y el saldo que quedó después (de la línea "Saldo: $X").
@@ -935,6 +981,13 @@ const RE_SALDO_LINEA = /saldo\s*:?\s*\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/i;
 // signo se haya perdido por completo.
 function parsearMovimientosOcr(texto) {
   const lineas = String(texto).split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Si el texto viene de una tabla de estado de cuenta, esta lectura por
+  // columnas es mucho más confiable que la de abajo (pensada para capturas
+  // de apps bancarias tipo chat, con líneas +/- o "saldo:").
+  const tabla = parsearTablaEstadoCuenta(lineas);
+  if (tabla) return tabla;
+
   const bloques = [];
   let bloqueActual = null;
   let buffer = [];
@@ -951,6 +1004,7 @@ function parsearMovimientosOcr(texto) {
     // el OCR perdió — ese monto igual se recupera por diferencia de saldos).
     if (/^saldo\b/i.test(linea) && !RE_SALDO_LINEA.test(linea)) continue;
     if (/^(recientes|rechazados)$/i.test(linea)) continue;
+    if (/^(fecha|descripci[oó]n|cargo|abono)$/i.test(linea)) continue;
     if (/^[\$Ss]?\s?\d[\d.,]*$/.test(linea)) continue;
 
     if (esEncabezadoFecha(linea)) {
