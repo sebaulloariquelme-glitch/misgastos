@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Mi Caja" />
 <meta name="theme-color" content="#0a0a12" />
-<meta name="app-version" content="2026-09-25.1" />
+<meta name="app-version" content="2026-09-25.2" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
@@ -773,7 +773,7 @@
 // el propio archivo en el servidor (sin caché, con un query único para
 // evitar que cualquier caché intermedia lo intercepte) y si la versión no
 // coincide, se recarga sola.
-const APP_VERSION = '2026-09-25.1';
+const APP_VERSION = '2026-09-25.2';
 async function revisarVersionNueva() {
   try {
     const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
@@ -1278,10 +1278,29 @@ function renderCategoriaToggle(t) {
     `<button class="categoria-btn cat-${c.id}" data-emoji="${c.emoji}" onclick="setCategoria('${c.id}')">${c.label}</button>`
   ).join('');
   cont.style.display = cats.length ? 'grid' : 'none';
+  ajustarAlturaCategoriaToggle();
   // No se preselecciona ninguna: en egreso hay que elegirla a mano antes
   // de poder guardar (ver agregar()).
   const catValida = cats.some(c => c.id === categoria);
   setCategoria(catValida ? categoria : null);
+}
+
+// "Ingreso" tiene muchas menos categorías que "Egreso" (2 contra 9), así
+// que al cambiar de tipo el cuadro de categorías se achicaba de golpe — y
+// en escritorio eso arrastraba a toda la columna y a la lista de
+// movimientos con ella (ver sincronizarAlturaColumnas()). Se guarda el
+// alto que necesita "Egreso" (el más alto) y se aplica siempre como
+// mínimo, así el layout no salta de tamaño solo por cambiar el tipo.
+let alturaCategoriaToggleEgreso = null;
+function ajustarAlturaCategoriaToggle() {
+  const cont = document.getElementById('categoria-toggle');
+  if (!cont) return;
+  if (!esDesktop()) { cont.style.minHeight = ''; return; }
+  if (tipo === 'egreso') {
+    cont.style.minHeight = '';
+    alturaCategoriaToggleEgreso = cont.getBoundingClientRect().height;
+  }
+  if (alturaCategoriaToggleEgreso) cont.style.minHeight = alturaCategoriaToggleEgreso + 'px';
 }
 
 function setCategoria(catId) {
@@ -1751,6 +1770,10 @@ function actualizarUI() {
 // hermana (align-items:stretch solo estira la más corta), así que se mide
 // en JS después de cada render.
 function sincronizarAlturaColumnas() {
+  // Por si un resize cruzó a mobile/escritorio con "Ingreso" seleccionado
+  // (el otro disparador es renderCategoriaToggle, al cambiar de tipo).
+  ajustarAlturaCategoriaToggle();
+
   const lista = document.getElementById('lista');
   if (!lista) return;
   if (!esDesktop()) {
